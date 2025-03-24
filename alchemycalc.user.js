@@ -2,9 +2,9 @@
 // @name         MWIAlchemyCalc
 
 // @namespace    http://tampermonkey.net/
-// @version      2025-03-15
+// @version      2025-03-24
 // @description  显示炼金收益
-// @author       You
+// @author       IOMisaka
 // @match        https://www.milkywayidle.com/*
 // @match        https://test.milkywayidle.com/*
 // @icon         data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==
@@ -13,6 +13,7 @@
 
 (function () {
     'use strict';
+    
     let itemNamesCN = {
         '/items/coin': '金币',
         '/items/task_token': '任务代币',
@@ -1520,6 +1521,11 @@
                 let newIds = obj.endCharacterItems.map(i => i.id);
                 characterData.characterItems = characterData.characterItems.filter(e => !newIds.includes(e.id));//移除存在的物品
                 characterData.characterItems.push(...obj.endCharacterItems);//放入新物品
+            } else if (obj.type === "action_type_consumable_slots_updated") {//更新饮料和食物槽数据
+                characterData.actionTypeDrinkSlotsMap = obj.actionTypeDrinkSlotsMap;
+                characterData.actionTypeFoodSlotsMap = obj.actionTypeFoodSlotsMap;
+
+                handleAlchemyDetailChanged();//触发更新
             }
         }
 
@@ -1544,6 +1550,11 @@
      */
     function getItemCount(itemHrid, enhancementLevel = 0) {
         return characterData.characterItems.find(item => item.itemHrid === itemHrid && item.itemLocationHrid === "/item_locations/inventory" && item.enhancementLevel === enhancementLevel)?.count || 0;//背包里面的物品
+    }
+    //获取饮料状态，传入类型/action_types/brewing,返回列表
+
+    function getDrinkSlots(actionTypeHrid) {
+        return characterData.actionTypeDrinkSlotsMap[actionTypeHrid]
     }
     /////////游戏静态数据////////////
     //中英文都有可能
@@ -1582,25 +1593,26 @@
         }
         console.info(`observing "${rootSelector}"`);
 
-        function delayCall(func, delay = 100) {
+        function delayCall(func,observer, delay = 100) {
             //判断func是function类型
             if (typeof func !== 'function') return;
             // 延迟执行，如果再次调用则在原有基础上继续延时
             func.timeout && clearTimeout(func.timeout);
-            func.timeout = setTimeout(() => func(), delay);
+            func.timeout = setTimeout(() => func(observer), delay);
         }
 
-        const observer = new MutationObserver((mutationsList) => {
+        const observer = new MutationObserver((mutationsList,observer) => {
+
             mutationsList.forEach((mutation) => {
                 mutation.addedNodes.forEach((addedNode) => {
                     if (addedNode.matches && addedNode.matches(nodeSelector)) {
-                        addFunc?.(addedNode);
+                        addFunc?.(observer);
                     }
                 });
 
                 mutation.removedNodes.forEach((removedNode) => {
                     if (removedNode.matches && removedNode.matches(nodeSelector)) {
-                        removeFunc?.(removedNode);
+                        removeFunc?.(observer);
                     }
                 });
 
@@ -1608,12 +1620,12 @@
                 if (mutation.type === 'childList') {
                     let node = mutation.target.matches(nodeSelector) ? mutation.target : mutation.target.closest(nodeSelector);
                     if (node) {
-                        delayCall(updateFunc); // 延迟 100ms 合并变动处理，避免频繁触发
+                        delayCall(updateFunc,observer); // 延迟 100ms 合并变动处理，避免频繁触发
                     }
 
                 } else if (mutation.type === 'characterData') {
                     // 文本内容变化（如文本节点修改）
-                    delayCall(updateFunc);
+                    delayCall(updateFunc,observer);
                 }
             });
         });
@@ -1624,7 +1636,9 @@
             subtree: true,
             characterData: true
         };
-
+        observer.reobserve = function () {
+            observer.observe(rootNode,config);
+        }//重新观察
         observer.observe(rootNode, config);
         return observer;
     }
@@ -1633,29 +1647,43 @@
     hookWS();//hook收到角色信息
 
     //模块逻辑代码
+    const MARKET_API_URL = "https://raw.githubusercontent.com/holychikenz/MWIApi/main/milkyapi.json";
 
-    let priceList = JSON.parse(localStorage.getItem("marketJson"));
+    let marketData = JSON.parse(localStorage.getItem("MWIAPI_JSON")||localStorage.getItem("MWITools_marketAPI_json"));//Use MWITools的API数据
+    fetch(MARKET_API_URL).then(res=>{res.json().then(data=>{
+        marketData = data;
+        localStorage.setItem("MWITools_marketAPI_json",JSON.stringify(data));//更新本地缓存数据
+        localStorage.setItem("MWIAPI_JSON",JSON.stringify(data));//更新本地缓存数据
+        console.info("MWITools_marketAPI_json MWIAPI_JSON updated:",new Date(marketData.time*1000).toLocaleString());
+    })});
+
 
     //返回[买,卖]
     function getPrice(itemHrid) {
-        let price = priceList[itemNames[itemHrid]];
+        let price = marketData.market[itemNames[itemHrid]];
         return price;
     }
 
-    //计算收益做count次
-    function calculateProfit(data, count = 1) {
+    //计算每次的收益
+    function calculateProfit(data) {
         let profit = 0;
-        let input=0;
-        let output=0;
-        let essence=0;
-        let rare=0;
+        let input = 0;
+        let output = 0;
+        let essence = 0;
+        let rare = 0;
+        let tea=0;
+        let catalyst=0;
         for (let item of data.inputItems) {//消耗物品每次必定消耗
 
             input -= getPrice(item.itemHrid).bid * item.count;//买入材料价格*数量
 
         }
+        for(let item of data.teaUsage) {//茶每次必定消耗
+            tea -= getPrice(item.itemHrid).bid * item.count;//买入材料价格*数量
+        }
+
         for (let item of data.outputItems) {//产出物品每次不一定产出，需要计算成功率
-            output += getPrice(item.itemHrid).ask * item.count*data.successRate;//卖出产出价格*数量*成功率
+            output += getPrice(item.itemHrid).ask * item.count * data.successRate;//卖出产出价格*数量*成功率
 
         }
         for (let item of data.essenceDrops) {//精华按自己的几率出
@@ -1666,16 +1694,34 @@
                 rare += getPrice(openItem.itemHrid).ask * openItem.count * item.count;//已折算
             });
         }
-        profit = input + output + essence + rare;
-        console.log(`每次收益${profit}=材料:${input}+产出:${output}+精华:${essence}+稀有:${rare}`);
-        return profit * count;//再乘以次数
-    }
+        //催化剂
+        for (let item of data.catalystItems) {//催化剂,成功才会用
+            catalyst -= getPrice(item.itemHrid).bid * item.count*data.successRate;//买入材料价格*数量
+        }
 
-    function handleAlchemyDetailChanged(node) {
+        profit = input + tea + output + essence + rare + catalyst;
+        let description = `Last Update：${new Date(marketData.time*1000).toLocaleString()}\n每次收益${profit}=\n\t材料(${input})\n\t茶(${tea})\n\t催化剂(${catalyst})\n\t产出(${output})\n\t精华(${essence})\n\t稀有(${rare})`;
+        console.info(description);
+        return [profit,description];//再乘以次数
+    }
+    function showNumber(num) {
+        if (num === 0) return "0";  // 单独处理0的情况
+        
+        const sign = num > 0 ? '+' : '';
+        const absNum = Math.abs(num);
+        
+        return absNum >= 1e10 ? `${sign}${Math.floor(num/1e9)}B` :
+               absNum >= 1e7  ? `${sign}${Math.floor(num/1e6)}M` :
+               absNum >= 1e4  ? `${sign}${Math.floor(num/1e3)}K` :
+               `${sign}${Math.floor(num)}`;
+    }
+    function handleAlchemyDetailChanged(observer) {
         let inputItems = [];
         let outputItems = [];
         let essenceDrops = [];
         let rareDrops = [];
+        let teaUsage = [];
+        let catalystItems=[];
 
         let costNodes = document.querySelector(".SkillActionDetail_itemRequirements__3SPnA");
         if (!costNodes) return;//没有炼金详情就不处理
@@ -1713,21 +1759,52 @@
         //成功率
         let successRateStr = document.querySelector(".SkillActionDetail_successRate__2jPEP .SkillActionDetail_value__dQjYH").textContent;
         let successRate = parseFloat(successRateStr.substring(0, successRateStr.length - 1)) / 100.0;
-
+        
         //消耗时间
         let costTimeStr = document.querySelector(".SkillActionDetail_timeCost__1jb2x .SkillActionDetail_value__dQjYH").textContent;
         let costSeconds = parseFloat(costTimeStr.substring(0, costTimeStr.length - 1));//秒，有分再改
+
+        //茶饮
+        let teas = getDrinkSlots("/action_types/alchemy");//炼金茶配置
+        for (let tea of teas) {
+            if(tea){//有可能空位
+                teaUsage.push({ itemHrid: tea.itemHrid, count: costSeconds/300});
+            }
+        }
+
+        //催化剂
+        let catalystItem = document.querySelector(".SkillActionDetail_catalystItemInput__2ERjq .Icon_icon__2LtL_");
+        if(catalystItem){
+            catalystItems=[{ itemHrid: getItemHridByShowName(catalystItem.getAttribute("aria-label")), count: 1 }];
+        }
+
+        //返回结果
         let ret = {
             inputItems: inputItems,
             outputItems: outputItems,
             essenceDrops: essenceDrops,
             rareDrops: rareDrops,
             successRate: successRate,
-            costTime: costSeconds
+            costTime: costSeconds,
+            teaUsage: teaUsage,
+            catalystItems: catalystItems
         }
+        
+
         //次数,收益
-        let times = 3600 / costSeconds;
-        let profit = calculateProfit(ret) * times;
+        let result = calculateProfit(ret);
+        let profit = result[0];
+        let desc = result[1];
+
+        let timesPerHour = 3600 / costSeconds;
+        let profitPerHour = profit * timesPerHour;
+
+        let timesPerDay = 24 * timesPerHour;
+        let profitPerDay = profit * timesPerDay;
+
+
+
+        observer?.disconnect();//断开观察
 
         //显示位置
         let showParent = document.querySelector(".SkillActionDetail_notes__2je2F");
@@ -1739,14 +1816,21 @@
         }
 
         let color = "white";
-        if (profit > 0) {
+        if (profitPerHour > 0) {
             color = "lime";
-        } else if (profit < 0) {
+        } else if (profitPerHour < 0) {
             color = "red";
         }
-        label.innerHTML = `<div id="alchemoo" style="color: ${color};"><span>预计收益：<span><span>${Math.floor(profit)}/h</span><br/><span>炼金次数：</span><span>${Math.floor(times)}<span></div>`;
+        label.innerHTML = `
+        <div id="alchemoo" style="color: ${color};">
+            <span title="${desc}">预估收益ℹ️：</span><br/>
+            <span>🪙${showNumber(profit)}/次</span><br/>
+            <span title="${showNumber(timesPerHour)}次">🪙${showNumber(profitPerHour)}/时</span><br/>
+            <span title="${showNumber(timesPerDay)}次">🪙${showNumber(profitPerDay)}/天</span>
+            </div>`;
 
         console.log(ret);
+        observer?.reobserve();
     }
-    observeNode(".SkillActionDetail_info__3umoI", ".MainPanel_mainPanel__Ex2Ir", handleAlchemyDetailChanged, handleAlchemyDetailChanged);
+    observeNode(".SkillActionDetail_alchemyComponent__1J55d", ".MainPanel_mainPanel__Ex2Ir", handleAlchemyDetailChanged, handleAlchemyDetailChanged);
 })();
