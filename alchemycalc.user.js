@@ -2,7 +2,7 @@
 // @name         MWIAlchemyCalc
 
 // @namespace    http://tampermonkey.net/
-// @version      2025-03-25.3
+// @version      2025-03-25.4
 // @description  显示炼金收益 milkywayidle 银河奶牛放置
 
 // @author       IOMisaka
@@ -1541,15 +1541,36 @@
             } else if (obj.type === "house_rooms_updated") {//房屋更新
                 characterData.characterHouseRoomMap = obj.characterHouseRoomMap;
                 characterData.houseActionTypeBuffsMap = obj.houseActionTypeBuffsMap;
+            }else if(obj.type==="action_completed"){//更新技能等级和经验
+                if(obj.endCharacterSkills){
+                    for(let newSkill of obj.endCharacterSkills){
+                    let oldSkill = characterData.characterSkills.find(skill=>skill.skillHrid===newSkill.skillHrid);
+                    
+                    oldSkill.level=newSkill.level;
+                    oldSkill.experience=newSkill.experience;
+                    }
+                }
             }
         }
         return message;
     }
     /////////辅助函数,角色动态数据///////////
+    // skillHrid = "/skills/alchemy"
+    function getSkillLevel(skillHrid,withBuff=false){
+        let skill = characterData.characterSkills.find(skill => skill.skillHrid === skillHrid);
+        let level = skill?.level || 0;
 
-    function getConsumableBuffs(actionTypeHrid) {
-        return characterData.consumableActionTypeBuffsMap[actionTypeHrid];
+        if(withBuff){//计算buff加成
+            level += getBuffValueByType(
+                skillHrid.replace("/skills/","/action_types/"),
+                skillHrid.replace("/skills/","/buff_types/")+"_level"
+            );
+        }
+        return level;
     }
+    
+    /// actionTypeHrid = "/action_types/alchemy"
+    /// buffTypeHrid = "/buff_types/alchemy_level"
     function getBuffValueByType(actionTypeHrid, buffTypeHrid) {
         let returnValue = 0;
         //社区buff
@@ -1828,24 +1849,13 @@
             catalystItems = [{ itemHrid: getItemHridByShowName(catalystItem.getAttribute("aria-label")), count: 1 }];
         }
 
-        //计算效率buff
-        let effeciency = 0;
-        let buffs = Object.entries(document.querySelectorAll(".SkillActionDetail_buffs__val5d .SkillActionDetail_buffsIconContainer__1hyy-")[0])[1][1].children.props.buffs;
-        for (let buff of buffs) {//buff加成，包含了社区buff，装备buff,房屋buff,包含了炼金茶？
-            if (buff.uniqueHrid && buff.typeHrid === "/buff_types/efficiency") {
-                effeciency += buff.flatBoost;
-            }
+        //计算效率
+        let effeciency = getBuffValueByType("/action_types/alchemy","/buff_types/efficiency");
+        let skillLevel = getSkillLevel("/skills/alchemy",true);
+        let mainItem = getItemDataByHrid(inputItems[0].itemHrid);
+        if(mainItem.itemLevel){
+            effeciency += Math.max(0,skillLevel-mainItem.itemLevel)/100;//等级加成
         }
-
-        //炼金茶buff配置
-        for (let buff of getConsumableBuffs("/action_types/alchemy")) {
-            if (buff.typeHrid === "/buff_types/efficiency") {
-                effeciency += buff.flatBoost;
-            }
-
-        }
-        let newEffeciency = getBuffValueByType("/action_types/alchemy","/buff_types/efficiency");
-        effeciency = newEffeciency;
 
         costSeconds = costSeconds * (1 - effeciency);//效率，相当于减少每次的时间
         //茶饮，茶饮的消耗就减少了
@@ -1868,7 +1878,7 @@
             costTime: costSeconds,
             teaUsage: teaUsage,
             catalystItems: catalystItems,
-            effeciency: effeciency
+            effeciency: effeciency,
         }
 
         //次数,收益
