@@ -2,7 +2,7 @@
 // @name         MWIAlchemyCalc
 
 // @namespace    http://tampermonkey.net/
-// @version      2025-03-25.4
+// @version      2025-03-25.5
 // @description  显示炼金收益 milkywayidle 银河奶牛放置
 
 // @author       IOMisaka
@@ -1519,11 +1519,7 @@
         if (obj) {
             if (obj.type === "init_character_data") {
                 characterData = obj;
-            } else if (obj && obj.endCharacterItems) {
-                let newIds = obj.endCharacterItems.map(i => i.id);
-                characterData.characterItems = characterData.characterItems.filter(e => !newIds.includes(e.id));//移除存在的物品
-                characterData.characterItems.push(...obj.endCharacterItems);//放入新物品
-            } else if (obj.type === "action_type_consumable_slots_updated") {//更新饮料和食物槽数据
+            }  else if (obj.type === "action_type_consumable_slots_updated") {//更新饮料和食物槽数据
                 characterData.actionTypeDrinkSlotsMap = obj.actionTypeDrinkSlotsMap;
                 characterData.actionTypeFoodSlotsMap = obj.actionTypeFoodSlotsMap;
 
@@ -1542,6 +1538,11 @@
                 characterData.characterHouseRoomMap = obj.characterHouseRoomMap;
                 characterData.houseActionTypeBuffsMap = obj.houseActionTypeBuffsMap;
             }else if(obj.type==="action_completed"){//更新技能等级和经验
+                if (obj.endCharacterItems) {//道具更新
+                    let newIds = obj.endCharacterItems.map(i => i.id);
+                    characterData.characterItems = characterData.characterItems.filter(e => !newIds.includes(e.id));//移除存在的物品
+                    characterData.characterItems.push(...obj.endCharacterItems);//放入新物品
+                }
                 if(obj.endCharacterSkills){
                     for(let newSkill of obj.endCharacterSkills){
                     let oldSkill = characterData.characterSkills.find(skill=>skill.skillHrid===newSkill.skillHrid);
@@ -1549,6 +1550,12 @@
                     oldSkill.level=newSkill.level;
                     oldSkill.experience=newSkill.experience;
                     }
+                }
+            }else if(obj.type==="items_updated"){
+                if (obj.endCharacterItems) {//道具更新
+                    let newIds = obj.endCharacterItems.map(i => i.id);
+                    characterData.characterItems = characterData.characterItems.filter(e => !newIds.includes(e.id));//移除存在的物品
+                    characterData.characterItems.push(...obj.endCharacterItems);//放入新物品
                 }
             }
         }
@@ -1857,7 +1864,8 @@
             effeciency += Math.max(0,skillLevel-mainItem.itemLevel)/100;//等级加成
         }
 
-        costSeconds = costSeconds * (1 - effeciency);//效率，相当于减少每次的时间
+        //costSeconds = costSeconds * (1 - effeciency);//效率，相当于减少每次的时间
+        costSeconds = costSeconds / (1 + effeciency);
         //茶饮，茶饮的消耗就减少了
         let teas = getDrinkSlots("/action_types/alchemy");//炼金茶配置
         for (let tea of teas) {
