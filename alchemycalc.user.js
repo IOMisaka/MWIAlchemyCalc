@@ -2,7 +2,7 @@
 // @name         MWIAlchemyCalc
 
 // @namespace    http://tampermonkey.net/
-// @version      2025-03-25.5
+// @version      2025-03-28
 // @description  显示炼金收益 milkywayidle 银河奶牛放置
 
 // @author       IOMisaka
@@ -1807,7 +1807,7 @@
         let teaUsage = [];
         let catalystItems = [];
 
-        let costNodes = document.querySelector(".SkillActionDetail_itemRequirements__3SPnA");
+        let costNodes = document.querySelector(".AlchemyPanel_skillActionDetailContainer__o9SsW .SkillActionDetail_itemRequirements__3SPnA");
         if (!costNodes) return;//没有炼金详情就不处理
 
         let costs = Array.from(costNodes.children);
