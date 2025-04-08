@@ -2,7 +2,7 @@
 // @name         MWIAlchemyCalc
 
 // @namespace    http://tampermonkey.net/
-// @version      2025-03-28
+// @version      20250408.53139
 // @description  显示炼金收益 milkywayidle 银河奶牛放置
 
 // @author       IOMisaka
@@ -1757,6 +1757,8 @@
         let rare = 0;
         let tea = 0;
         let catalyst = 0;
+
+        
         for (let item of data.inputItems) {//消耗物品每次必定消耗
 
             input -= getPrice(item.itemHrid).ask * item.count;//买入材料价格*数量
@@ -1770,12 +1772,12 @@
             output += getPrice(item.itemHrid).bid * item.count * data.successRate;//卖出产出价格*数量*成功率
 
         }
-        for (let item of data.essenceDrops) {//精华和宝箱都要算成功率 -> 不
-            essence += getPrice(item.itemHrid).bid * item.count;//采集数据的地方已经算进去了
+        for (let item of data.essenceDrops) {//精华和宝箱都要算成功率 -> 不 ->要算的
+            essence += getPrice(item.itemHrid).bid * item.count * data.successRate;//采集数据的地方已经算进去了
         }
-        for (let item of data.rareDrops) {//宝箱也是按自己的几率出 -> 不
+        for (let item of data.rareDrops) {//宝箱也是按自己的几率出 -> 不 ->要算的
             getOpenableItems(item.itemHrid).forEach(openItem => {
-                rare += getPrice(openItem.itemHrid).bid * openItem.count * item.count;//已折算
+                rare += getPrice(openItem.itemHrid).bid * openItem.count * item.count * data.successRate;//已折算
             });
         }
         //催化剂
@@ -1789,14 +1791,15 @@
         return [profit, description];//再乘以次数
     }
     function showNumber(num) {
+        if(isNaN(num))return num;
         if (num === 0) return "0";  // 单独处理0的情况
-
+    
         const sign = num > 0 ? '+' : '';
         const absNum = Math.abs(num);
-
-        return absNum >= 1e10 ? `${sign}${Math.floor(num / 1e9)}B` :
-            absNum >= 1e7 ? `${sign}${Math.floor(num / 1e6)}M` :
-                absNum >= 1e4 ? `${sign}${Math.floor(num / 1e3)}K` :
+    
+        return absNum >= 1e12 ? `${sign}${Math.floor(num / 1e9)}B` :
+            absNum >= 1e9 ? `${sign}${Math.floor(num / 1e6)}M` :
+                absNum >= 1e6 ? `${sign}${Math.floor(num / 1e3)}K` :
                     `${sign}${Math.floor(num)}`;
     }
     function handleAlchemyDetailChanged(observer) {
