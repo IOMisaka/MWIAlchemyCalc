@@ -2,7 +2,7 @@
 // @name         MWIAlchemyCalc
 
 // @namespace    http://tampermonkey.net/
-// @version      20250408.53139
+// @version      20250412.55398
 // @description  显示炼金收益 milkywayidle 银河奶牛放置
 
 // @author       IOMisaka
@@ -1519,7 +1519,7 @@
         if (obj) {
             if (obj.type === "init_character_data") {
                 characterData = obj;
-            }  else if (obj.type === "action_type_consumable_slots_updated") {//更新饮料和食物槽数据
+            } else if (obj.type === "action_type_consumable_slots_updated") {//更新饮料和食物槽数据
                 characterData.actionTypeDrinkSlotsMap = obj.actionTypeDrinkSlotsMap;
                 characterData.actionTypeFoodSlotsMap = obj.actionTypeFoodSlotsMap;
 
@@ -1537,21 +1537,21 @@
             } else if (obj.type === "house_rooms_updated") {//房屋更新
                 characterData.characterHouseRoomMap = obj.characterHouseRoomMap;
                 characterData.houseActionTypeBuffsMap = obj.houseActionTypeBuffsMap;
-            }else if(obj.type==="action_completed"){//更新技能等级和经验
+            } else if (obj.type === "action_completed") {//更新技能等级和经验
                 if (obj.endCharacterItems) {//道具更新
                     let newIds = obj.endCharacterItems.map(i => i.id);
                     characterData.characterItems = characterData.characterItems.filter(e => !newIds.includes(e.id));//移除存在的物品
                     characterData.characterItems.push(...obj.endCharacterItems);//放入新物品
                 }
-                if(obj.endCharacterSkills){
-                    for(let newSkill of obj.endCharacterSkills){
-                    let oldSkill = characterData.characterSkills.find(skill=>skill.skillHrid===newSkill.skillHrid);
-                    
-                    oldSkill.level=newSkill.level;
-                    oldSkill.experience=newSkill.experience;
+                if (obj.endCharacterSkills) {
+                    for (let newSkill of obj.endCharacterSkills) {
+                        let oldSkill = characterData.characterSkills.find(skill => skill.skillHrid === newSkill.skillHrid);
+
+                        oldSkill.level = newSkill.level;
+                        oldSkill.experience = newSkill.experience;
                     }
                 }
-            }else if(obj.type==="items_updated"){
+            } else if (obj.type === "items_updated") {
                 if (obj.endCharacterItems) {//道具更新
                     let newIds = obj.endCharacterItems.map(i => i.id);
                     characterData.characterItems = characterData.characterItems.filter(e => !newIds.includes(e.id));//移除存在的物品
@@ -1563,38 +1563,38 @@
     }
     /////////辅助函数,角色动态数据///////////
     // skillHrid = "/skills/alchemy"
-    function getSkillLevel(skillHrid,withBuff=false){
+    function getSkillLevel(skillHrid, withBuff = false) {
         let skill = characterData.characterSkills.find(skill => skill.skillHrid === skillHrid);
         let level = skill?.level || 0;
 
-        if(withBuff){//计算buff加成
+        if (withBuff) {//计算buff加成
             level += getBuffValueByType(
-                skillHrid.replace("/skills/","/action_types/"),
-                skillHrid.replace("/skills/","/buff_types/")+"_level"
+                skillHrid.replace("/skills/", "/action_types/"),
+                skillHrid.replace("/skills/", "/buff_types/") + "_level"
             );
         }
         return level;
     }
-    
+
     /// actionTypeHrid = "/action_types/alchemy"
     /// buffTypeHrid = "/buff_types/alchemy_level"
     function getBuffValueByType(actionTypeHrid, buffTypeHrid) {
         let returnValue = 0;
         //社区buff
 
-        for (let buff of characterData.communityActionTypeBuffsMap[actionTypeHrid]) {
+        for (let buff of characterData.communityActionTypeBuffsMap[actionTypeHrid] || []) {
             if (buff.typeHrid === buffTypeHrid) returnValue += buff.flatBoost;
         }
         //装备buff
-        for (let buff of characterData.equipmentActionTypeBuffsMap[actionTypeHrid]) {
+        for (let buff of characterData.equipmentActionTypeBuffsMap[actionTypeHrid] || []) {
             if (buff.typeHrid === buffTypeHrid) returnValue += buff.flatBoost;
         }
         //房屋buff
-        for (let buff of characterData.houseActionTypeBuffsMap[actionTypeHrid]) {
+        for (let buff of characterData.houseActionTypeBuffsMap[actionTypeHrid] || []) {
             if (buff.typeHrid === buffTypeHrid) returnValue += buff.flatBoost;
         }
         //茶饮buff
-        for (let buff of characterData.consumableActionTypeBuffsMap[actionTypeHrid]) {
+        for (let buff of characterData.consumableActionTypeBuffsMap[actionTypeHrid] || []) {
             if (buff.typeHrid === buffTypeHrid) returnValue += buff.flatBoost;
         }
         return returnValue;
@@ -1715,15 +1715,17 @@
     //模块逻辑代码
     const MARKET_API_URL = "https://raw.githubusercontent.com/holychikenz/MWIApi/main/milkyapi.json";
 
-    let marketData = JSON.parse(localStorage.getItem("MWIAPI_JSON") || localStorage.getItem("MWITools_marketAPI_json"));//Use MWITools的API数据
-    fetch(MARKET_API_URL).then(res => {
-        res.json().then(data => {
-            marketData = data;
-            //更新本地缓存数据
-            localStorage.setItem("MWIAPI_JSON", JSON.stringify(data));//更新本地缓存数据
-            console.info("MWIAPI_JSON updated:", new Date(marketData.time * 1000).toLocaleString());
-        })
-    });
+    let marketData = JSON.parse(localStorage.getItem("MWIAPI_JSON") || localStorage.getItem("MWITools_marketAPI_json") || "{}");//Use MWITools的API数据
+    if (!(marketData?.time>Date.now() / 1000 - 86400)) {//如果本地缓存数据过期，则重新获取
+        fetch(MARKET_API_URL).then(res => {
+            res.json().then(data => {
+                marketData = data;
+                //更新本地缓存数据
+                localStorage.setItem("MWIAPI_JSON", JSON.stringify(data));//更新本地缓存数据
+                console.info("MWIAPI_JSON updated:", new Date(marketData.time * 1000).toLocaleString());
+            })
+        });
+    }
 
 
     //返回[买,卖]
@@ -1758,7 +1760,7 @@
         let tea = 0;
         let catalyst = 0;
 
-        
+
         for (let item of data.inputItems) {//消耗物品每次必定消耗
 
             input -= getPrice(item.itemHrid).ask * item.count;//买入材料价格*数量
@@ -1772,13 +1774,15 @@
             output += getPrice(item.itemHrid).bid * item.count * data.successRate;//卖出产出价格*数量*成功率
 
         }
-        for (let item of data.essenceDrops) {//精华和宝箱都要算成功率 -> 不 ->要算的
-            essence += getPrice(item.itemHrid).bid * item.count * data.successRate;//采集数据的地方已经算进去了
-        }
-        for (let item of data.rareDrops) {//宝箱也是按自己的几率出 -> 不 ->要算的
-            getOpenableItems(item.itemHrid).forEach(openItem => {
-                rare += getPrice(openItem.itemHrid).bid * openItem.count * item.count * data.successRate;//已折算
-            });
+        if (data.inputItems[0].itemHrid !== "/items/task_crystal") {//任务水晶有问题，暂时不计算
+            for (let item of data.essenceDrops) {//精华和宝箱都要算成功率 -> 不,这两个是按采集的时间出
+                essence += getPrice(item.itemHrid).bid * item.count;//采集数据的地方已经算进去了
+            }
+            for (let item of data.rareDrops) {//宝箱也是按自己的几率出 -> 不
+                getOpenableItems(item.itemHrid).forEach(openItem => {
+                    rare += getPrice(openItem.itemHrid).bid * openItem.count * item.count;//已折算
+                });
+            }
         }
         //催化剂
         for (let item of data.catalystItems) {//催化剂,成功才会用
@@ -1791,16 +1795,19 @@
         return [profit, description];//再乘以次数
     }
     function showNumber(num) {
-        if(isNaN(num))return num;
+        if (isNaN(num)) return num;
         if (num === 0) return "0";  // 单独处理0的情况
-    
+
         const sign = num > 0 ? '+' : '';
         const absNum = Math.abs(num);
-    
-        return absNum >= 1e12 ? `${sign}${Math.floor(num / 1e9)}B` :
-            absNum >= 1e9 ? `${sign}${Math.floor(num / 1e6)}M` :
-                absNum >= 1e6 ? `${sign}${Math.floor(num / 1e3)}K` :
+
+        return absNum >= 1e10 ? `${sign}${(num / 1e9).toFixed(1)}B` :
+            absNum >= 1e7 ? `${sign}${(num / 1e6).toFixed(1)}M` :
+                absNum >= 1e4 ? `${sign}${Math.floor(num / 1e3)}K` :
                     `${sign}${Math.floor(num)}`;
+    }
+    function parseNumber(str) {
+        return parseInt(str.replaceAll("/", "").replaceAll(",", "").replaceAll(" ", ""));
     }
     function handleAlchemyDetailChanged(observer) {
         let inputItems = [];
@@ -1817,11 +1824,14 @@
         //每三个元素取textContent拼接成一个字符串，用空格和/分割
         for (let i = 0; i < costs.length; i += 3) {
 
-            let costStr = costs[i].textContent + costs[i + 1].textContent + costs[i + 2].textContent;
-            //30M / 100,000    K M B
-            let costArr = costStr.replaceAll(",", "").split(/[\s/]/).filter(s => s);
-            inputItems.push({ itemHrid: getItemHridByShowName(costArr[2]), count: parseInt(costArr[1]) });
+            let need = parseNumber(costs[i + 1].textContent);
+            let nameArr = costs[i + 2].textContent.split("+");
+            let itemHrid = getItemHridByShowName(nameArr[0]);
+            let enhancementLevel = nameArr.length > 1 ? parseNumber(nameArr[1]) : 0;
+
+            inputItems.push({ itemHrid: itemHrid, enhancementLevel: enhancementLevel, count: need });
         }
+
         //炼金输出
         for (let line of document.querySelectorAll(".SkillActionDetail_alchemyOutput__6-92q .SkillActionDetail_drop__26KBZ")) {
             let count = parseFloat(line.children[0].textContent.replaceAll(",", ""));
@@ -1860,11 +1870,11 @@
         }
 
         //计算效率
-        let effeciency = getBuffValueByType("/action_types/alchemy","/buff_types/efficiency");
-        let skillLevel = getSkillLevel("/skills/alchemy",true);
+        let effeciency = getBuffValueByType("/action_types/alchemy", "/buff_types/efficiency");
+        let skillLevel = getSkillLevel("/skills/alchemy", true);
         let mainItem = getItemDataByHrid(inputItems[0].itemHrid);
-        if(mainItem.itemLevel){
-            effeciency += Math.max(0,skillLevel-mainItem.itemLevel)/100;//等级加成
+        if (mainItem.itemLevel) {
+            effeciency += Math.max(0, skillLevel - mainItem.itemLevel) / 100;//等级加成
         }
 
         //costSeconds = costSeconds * (1 - effeciency);//效率，相当于减少每次的时间
