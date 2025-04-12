@@ -2,7 +2,7 @@
 // @name         MWIAlchemyCalc
 
 // @namespace    http://tampermonkey.net/
-// @version      20250412.55398
+// @version      20250413.62594
 // @description  显示炼金收益 milkywayidle 银河奶牛放置
 
 // @author       IOMisaka
@@ -1864,7 +1864,7 @@
 
 
         //催化剂
-        let catalystItem = document.querySelector(".SkillActionDetail_catalystItemInput__2ERjq .Icon_icon__2LtL_");
+        let catalystItem = document.querySelector(".SkillActionDetail_catalystItemInput__2ERjq .Icon_icon__2LtL_")||document.querySelector(".SkillActionDetail_catalystItemInputContainer__5zmou .Item_iconContainer__5z7j4 .Icon_icon__2LtL_");//过程中是另一个框
         if (catalystItem) {
             catalystItems = [{ itemHrid: getItemHridByShowName(catalystItem.getAttribute("aria-label")), count: 1 }];
         }
