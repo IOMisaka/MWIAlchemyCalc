@@ -2,13 +2,13 @@
 // @name         MWIAlchemyCalc
 
 // @namespace    http://tampermonkey.net/
-// @version      20250414.1818
+// @version      20250424.1
 // @description  显示炼金收益 milkywayidle 银河奶牛放置
 
 // @author       IOMisaka
 // @match        https://www.milkywayidle.com/*
 // @match        https://test.milkywayidle.com/*
-// @icon         data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==
+// @icon         https://www.milkywayidle.com/favicon.svg
 // @grant        none
 // @license      MIT
 // ==/UserScript==
@@ -16,10 +16,10 @@
 (function () {
     'use strict';
     if (!window.mwi) {
-        console.error("MWIAlchemyCalc需要安装MWICore才能使用");
+        console.error("MWIAlchemyCalc需要安装mooket才能使用");
         return;
-      }
-      
+    }
+
     ////////////////code//////////////////
     function hookWS() {
         const dataProperty = Object.getOwnPropertyDescriptor(MessageEvent.prototype, "data");
@@ -190,7 +190,7 @@
     function observeNode(nodeSelector, rootSelector, addFunc = null, updateFunc = null, removeFunc = null) {
         const rootNode = document.querySelector(rootSelector);
         if (!rootNode) {
-            console.error(`Root node with selector "${rootSelector}" not found.wait for 1s to try again...`);
+            //console.error(`Root node with selector "${rootSelector}" not found.wait for 1s to try again...`);
             setTimeout(() => observeNode(nodeSelector, rootSelector, addFunc, updateFunc, removeFunc), 1000);
             return;
         }
@@ -253,7 +253,7 @@
     const MARKET_API_URL = "https://raw.githubusercontent.com/holychikenz/MWIApi/main/milkyapi.json";
 
     let marketData = JSON.parse(localStorage.getItem("MWIAPI_JSON") || localStorage.getItem("MWITools_marketAPI_json") || "{}");//Use MWITools的API数据
-    if (!(marketData?.time>Date.now() / 1000 - 86400)) {//如果本地缓存数据过期，则重新获取
+    if (!(marketData?.time > Date.now() / 1000 - 86400)) {//如果本地缓存数据过期，则重新获取
         fetch(MARKET_API_URL).then(res => {
             res.json().then(data => {
                 marketData = data;
@@ -267,7 +267,7 @@
 
     //返回[买,卖]
     function getPrice(itemHrid) {
-        return mwi.coreMarket.getItemPrice(itemHrid);   
+        return mwi.coreMarket.getItemPrice(itemHrid);
     }
 
     //计算每次的收益
@@ -316,7 +316,7 @@
     }
     function showNumber(num) {
         if (isNaN(num)) return num;
-        if (num === 0) return "0";  // 单独处理0的情况
+        if (num === 0) return "0";// 单独处理0的情况
 
         const sign = num > 0 ? '+' : '';
         const absNum = Math.abs(num);
@@ -384,7 +384,7 @@
 
 
         //催化剂
-        let catalystItem = document.querySelector(".SkillActionDetail_catalystItemInput__2ERjq .Icon_icon__2LtL_")||document.querySelector(".SkillActionDetail_catalystItemInputContainer__5zmou .Item_iconContainer__5z7j4 .Icon_icon__2LtL_");//过程中是另一个框
+        let catalystItem = document.querySelector(".SkillActionDetail_catalystItemInput__2ERjq .Icon_icon__2LtL_") || document.querySelector(".SkillActionDetail_catalystItemInputContainer__5zmou .Item_iconContainer__5z7j4 .Icon_icon__2LtL_");//过程中是另一个框
         if (catalystItem) {
             catalystItems = [{ itemHrid: getItemHridByShowName(catalystItem.getAttribute("aria-label")), count: 1 }];
         }
@@ -461,5 +461,5 @@
         //console.log(ret);
         observer?.reobserve();
     }
-    observeNode(".SkillActionDetail_alchemyComponent__1J55d", ".MainPanel_mainPanel__Ex2Ir", handleAlchemyDetailChanged, handleAlchemyDetailChanged);
+    observeNode(".SkillActionDetail_alchemyComponent__1J55d", "body", handleAlchemyDetailChanged, handleAlchemyDetailChanged);
 })();
