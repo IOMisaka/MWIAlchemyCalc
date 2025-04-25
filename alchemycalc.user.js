@@ -2,7 +2,7 @@
 // @name         MWIAlchemyCalc
 
 // @namespace    http://tampermonkey.net/
-// @version      20250424.1
+// @version      20250425.1
 // @description  显示炼金收益 milkywayidle 银河奶牛放置
 
 // @author       IOMisaka
@@ -74,8 +74,46 @@
             } else if (obj.type === "house_rooms_updated") {//房屋更新
                 characterData.characterHouseRoomMap = obj.characterHouseRoomMap;
                 characterData.houseActionTypeBuffsMap = obj.houseActionTypeBuffsMap;
-            } else if (obj.type === "action_completed") {//更新技能等级和经验
+            }
+            else if (obj.type === "actions_updated") {
+                obj.endCharacterActions?.forEach(
+                    action => {
+                        if (action.actionHrid.startsWith("/actions/alchemy")) {
+                            updateAlchemyAction(action);
+                        }
+                    }
+                );
+
+            }
+            else if (obj.type === "action_completed") {//更新技能等级和经验
                 if (obj.endCharacterItems) {//道具更新
+                    //炼金统计
+                    try {
+                        if (obj.endCharacterAction.actionHrid.startsWith("/actions/alchemy")) {//炼金统计
+                            let outputHashCount = {};
+                            let inputHashCount = {};
+                            let tempItems = {};
+                            obj.endCharacterItems.forEach(
+                                item => {
+                                    let existItem = tempItems[item.id] || characterData.characterItems.find(x => x.id === item.id);
+                                    let delta = (item.count - (existItem?.count || 0));//计数
+                                    if (delta < 0) {
+                                        inputHashCount[item.hash] = delta;
+                                        tempItems[item.id] = item;//替换旧的物品计数
+                                    } else if (delta > 0) {
+                                        outputHashCount[item.hash] = delta;
+                                        tempItems[item.id] = item;//替换旧的物品计数
+                                    } else {
+                                        console.log("炼金统计出错?不应该为0", item);
+                                    }
+                                }
+                            );
+                            countAlchemyOutput(inputHashCount, outputHashCount);
+                        }
+                    } catch (e) { }
+
+
+
                     let newIds = obj.endCharacterItems.map(i => i.id);
                     characterData.characterItems = characterData.characterItems.filter(e => !newIds.includes(e.id));//移除存在的物品
                     characterData.characterItems.push(...obj.endCharacterItems);//放入新物品
@@ -266,8 +304,8 @@
 
 
     //返回[买,卖]
-    function getPrice(itemHrid) {
-        return mwi.coreMarket.getItemPrice(itemHrid);
+    function getPrice(itemHrid, enhancementLevel = 0) {
+        return mwi.coreMarket.getItemPrice(itemHrid, enhancementLevel);
     }
 
     //计算每次的收益
@@ -299,9 +337,10 @@
                 essence += getPrice(item.itemHrid).bid * item.count;//采集数据的地方已经算进去了
             }
             for (let item of data.rareDrops) {//宝箱也是按自己的几率出 -> 不
-                getOpenableItems(item.itemHrid).forEach(openItem => {
-                    rare += getPrice(openItem.itemHrid).bid * openItem.count * item.count;//已折算
-                });
+                // getOpenableItems(item.itemHrid).forEach(openItem => {
+                //     rare += getPrice(openItem.itemHrid).bid * openItem.count * item.count;//已折算
+                // });
+                rare += getPrice(item.itemHrid).bid * item.count;
             }
         }
         //催化剂
@@ -329,6 +368,7 @@
     function parseNumber(str) {
         return parseInt(str.replaceAll("/", "").replaceAll(",", "").replaceAll(" ", ""));
     }
+    let profitPerDay=0;
     function handleAlchemyDetailChanged(observer) {
         let inputItems = [];
         let outputItems = [];
@@ -431,7 +471,7 @@
         let profitPerHour = profit * timesPerHour;
 
         let timesPerDay = 24 * timesPerHour;
-        let profitPerDay = profit * timesPerDay;
+        profitPerDay = profit * timesPerDay;
 
         observer?.disconnect();//断开观察
 
@@ -461,5 +501,169 @@
         //console.log(ret);
         observer?.reobserve();
     }
+
     observeNode(".SkillActionDetail_alchemyComponent__1J55d", "body", handleAlchemyDetailChanged, handleAlchemyDetailChanged);
+
+    let currentInput = {};
+    let currentOutput = {};
+    let alchemyStartTime = Date.now();
+    let lastAction = null;
+    let needClear=false;
+    //统计功能
+    function countAlchemyOutput(inputHashCount, outputHashCount) {
+        if(needClear){
+            currentOutput = {};
+            currentInput = {};
+            alchemyStartTime = Date.now();//重置开始时间
+            needClear = false;
+        }
+        for (let itemHash in inputHashCount) {
+            currentInput[itemHash] = (currentInput[itemHash] || 0) + inputHashCount[itemHash];
+        }
+        for (let itemHash in outputHashCount) {
+            currentOutput[itemHash] = (currentOutput[itemHash] || 0) + outputHashCount[itemHash];
+        }
+        showOutput();
+    }
+    
+    function updateAlchemyAction(action) {
+        if ((!lastAction) || (lastAction.id != action.id)) {//新动作，重置统计信息
+            lastAction = action;
+            needClear = true;
+            showOutput();//显示统计信息
+            return;
+        }
+        showOutput();
+    }
+    function calcChestPrice(itemHrid) {
+        let total = 0;
+        getOpenableItems(itemHrid).forEach(openItem => {
+            total += getPrice(openItem.itemHrid).bid * openItem.count;
+        });
+        return total;
+    }
+    function calcPrice(items) {
+        let total = 0;
+        for (let item of items) {
+
+            if (item.itemHrid === "/items/task_crystal") {//任务水晶有问题，暂时不计算
+            }
+            else if (getItemDataByHrid(item.itemHrid)?.categoryHrid === "/item_categories/loot") {
+                total += calcChestPrice(item.itemHrid) * item.count;
+            } else {
+                total += getPrice(item.itemHrid, item.enhancementLevel ?? 0).ask * item.count;//买入材料价格*数量
+            }
+
+        }
+        return total;
+    }
+    function itemHashToItem(itemHash) {
+        let item = {};
+        let arr = itemHash.split("::");
+        item.itemHrid = arr[2];
+        item.enhancementLevel = arr[3];
+        return item;
+    }
+    function getItemNameByHrid(itemHrid) {
+        return mwi.isZh ?
+            mwi.lang.zh.translation.itemNames[itemHrid] : mwi.lang.en.translation.itemNames[itemHrid];
+    }
+    function secondsToHms(seconds) {
+        seconds = Number(seconds);
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = Math.floor(seconds % 60);
+        
+        return [
+          h.toString().padStart(2, '0'),
+          m.toString().padStart(2, '0'),
+          s.toString().padStart(2, '0')
+        ].join(':');
+      }
+    function showOutput() {
+        let alchemyContainer = document.querySelector(".SkillActionDetail_alchemyComponent__1J55d");
+        if (!alchemyContainer) return;
+
+        if (!document.querySelector("#alchemoo_result")) {
+            let outputContainer = document.createElement("div");
+            outputContainer.id = "alchemoo_result";
+            outputContainer.innerHTML = `
+            <div id="alchemoo_title" style="font-weight: bold; margin-bottom: 10px; text-align: center; color: var(--color-space-300);">炼金结果</div>
+            <div id="alchemoo_cost"></div>
+            <div id="alchemoo_rate"></div>
+            <div id="alchemoo_output"></div>
+            <div id="alchemoo_essence"></div>
+            <div id="alchemoo_rare"></div>
+            <div id="alchemoo_exp"></div>
+            <div id="alchemoo_time"></div>
+            <div id="alchemoo_total" style="border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;"></div>
+            `;
+            outputContainer.style.flex="0 0 auto";
+            alchemyContainer.appendChild(outputContainer);
+        }
+        "💰"
+
+        let cost = calcPrice(Object.entries(currentInput).map(
+            ([itemHash, count]) => {
+                let arr = itemHash.split("::");
+                return { "itemHrid": arr[2], "enhancementLevel": parseInt(arr[3]), "count": count }
+            })
+        );
+        let gain = calcPrice(Object.entries(currentOutput).map(
+            ([itemHash, count]) => {
+                let arr = itemHash.split("::");
+                return { "itemHrid": arr[2], "enhancementLevel": parseInt(arr[3]), "count": count }
+            })
+        );
+        let total = cost + gain;
+
+        let text ="";
+        //消耗
+        Object.entries(currentInput).forEach(([itemHash, count]) => {
+            let item = itemHashToItem(itemHash);
+            let price = getPrice(item.itemHrid);
+            text += `
+            <div title="直买价：${price.ask}" style="border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;white-space:nowrap;display:inline-flex">
+            <svg width="14px" height="14px" style="display:inline-block"><use href="/static/media/items_sprite.6d12eb9d.svg#${item.itemHrid.replace("/items/","")}"></use></svg>
+            <span style="display:inline-block">${getItemNameByHrid(item.itemHrid)}</span>
+            <span style="color:red" style="display:inline-block">${showNumber(count).replace("-","*")}</span>
+            </div>
+            `;
+        });
+        text += `<div>=<span style="color:red">${showNumber(cost)}</span></div>`;
+        document.querySelector("#alchemoo_cost").innerHTML = text;
+
+        document.querySelector("#alchemoo_rate").innerHTML = `<br/>`;//成功率
+
+        text="";
+        Object.entries(currentOutput).forEach(([itemHash, count]) => {
+            let item = itemHashToItem(itemHash);
+            let price = getPrice(item.itemHrid);
+            text += `
+            <div title="直卖价：${price.bid}" style="border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;white-space:nowrap;display:inline-flex">
+            <svg width="14px" height="14px" style="display:inline-block"><use href="/static/media/items_sprite.6d12eb9d.svg#${item.itemHrid.replace("/items/","")}"></use></svg>
+            <span style="display:inline-block">${getItemNameByHrid(item.itemHrid)}</span>
+            <span style="color:lime" style="display:inline-block">${showNumber(count).replace("+","*")}</span>
+            </div>
+            `;
+        });
+        text+=`<div>=<span style="color:lime">${showNumber(gain)}</span></div>`;
+        document.querySelector("#alchemoo_output").innerHTML = text;//产出
+
+        //document.querySelector("#alchemoo_essence").innerHTML = `<br/>`;//精华
+        //document.querySelector("#alchemoo_rare").innerHTML = `<br/>`;//稀有
+        //document.querySelector("#alchemoo_exp").innerHTML = `<br/>`;//经验
+        let time = (Date.now() - alchemyStartTime) / 1000;
+        //document.querySelector("#alchemoo_time").innerHTML = `<span>耗时:${secondsToHms(time)}</span>`;//时间
+        let perDay = (86400 / time) * total;
+
+        document.querySelector("#alchemoo_total").innerHTML = 
+        `
+        <span>耗时:${secondsToHms(time)}</span>
+        <div>累计收益:<span style="color:${total > 0 ? "lime" : "red"}">${showNumber(total)}</span></div>
+        <div>每日收益:<span style="color:${perDay>profitPerDay?"lime":"red"}">${showNumber(total*(86400/time)).replace("+",perDay>profitPerDay?"↑":"↓")}</span></div>
+        `;//总收益
+    }
+    //mwi.hookMessage("action_completed", countAlchemyOutput);
+    //mwi.hookMessage("action_updated", updateAlchemyAction)
 })();
