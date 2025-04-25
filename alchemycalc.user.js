@@ -623,7 +623,7 @@
             let item = itemHashToItem(itemHash);
             let price = getPrice(item.itemHrid);
             text += `
-            <div title="直买价：${price.ask}" style="border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;white-space:nowrap;display:inline-flex">
+            <div title="直买价：${price.ask}" style="border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;">
             <svg width="14px" height="14px" style="display:inline-block"><use href="/static/media/items_sprite.6d12eb9d.svg#${item.itemHrid.replace("/items/","")}"></use></svg>
             <span style="display:inline-block">${getItemNameByHrid(item.itemHrid)}</span>
             <span style="color:red" style="display:inline-block">${showNumber(count).replace("-","*")}</span>
@@ -640,7 +640,7 @@
             let item = itemHashToItem(itemHash);
             let price = getPrice(item.itemHrid);
             text += `
-            <div title="直卖价：${price.bid}" style="border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;white-space:nowrap;display:inline-flex">
+            <div title="直卖价：${price.bid}" style="border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;">
             <svg width="14px" height="14px" style="display:inline-block"><use href="/static/media/items_sprite.6d12eb9d.svg#${item.itemHrid.replace("/items/","")}"></use></svg>
             <span style="display:inline-block">${getItemNameByHrid(item.itemHrid)}</span>
             <span style="color:lime" style="display:inline-block">${showNumber(count).replace("+","*")}</span>
