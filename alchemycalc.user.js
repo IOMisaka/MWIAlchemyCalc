@@ -2,7 +2,7 @@
 // @name         MWIAlchemyCalc
 
 // @namespace    http://tampermonkey.net/
-// @version      20250425.1
+// @version      20250425.2
 // @description  显示炼金收益 milkywayidle 银河奶牛放置
 
 // @author       IOMisaka
@@ -108,7 +108,12 @@
                                     }
                                 }
                             );
-                            countAlchemyOutput(inputHashCount, outputHashCount);
+                            let index = [
+                                "/actions/alchemy/coinify",
+                                "/actions/alchemy/decompose",
+                                "/actions/alchemy/transmute"
+                            ].findIndex(x => x === obj.endCharacterAction.actionHrid);
+                            countAlchemyOutput(inputHashCount, outputHashCount, index);
                         }
                     } catch (e) { }
 
@@ -368,7 +373,7 @@
     function parseNumber(str) {
         return parseInt(str.replaceAll("/", "").replaceAll(",", "").replaceAll(" ", ""));
     }
-    let profitPerDay=0;
+    let predictPerDay = {};
     function handleAlchemyDetailChanged(observer) {
         let inputItems = [];
         let outputItems = [];
@@ -471,7 +476,13 @@
         let profitPerHour = profit * timesPerHour;
 
         let timesPerDay = 24 * timesPerHour;
-        profitPerDay = profit * timesPerDay;
+        let profitPerDay = profit * timesPerDay;
+
+        const buttons = document.querySelectorAll(".AlchemyPanel_tabsComponentContainer__1f7FY .MuiButtonBase-root.MuiTab-root.MuiTab-textColorPrimary.css-1q2h7u5");
+        const selectedIndex = Array.from(buttons).findIndex(button =>
+            button.classList.contains('Mui-selected')
+        );
+        predictPerDay[selectedIndex] = profitPerDay;//记录第几个对应的每日收益
 
         observer?.disconnect();//断开观察
 
@@ -508,10 +519,12 @@
     let currentOutput = {};
     let alchemyStartTime = Date.now();
     let lastAction = null;
-    let needClear=false;
+    let needClear = false;
+    let alchemyIndex = 0;
     //统计功能
-    function countAlchemyOutput(inputHashCount, outputHashCount) {
-        if(needClear){
+    function countAlchemyOutput(inputHashCount, outputHashCount, index) {
+        alchemyIndex = index;
+        if (needClear) {
             currentOutput = {};
             currentInput = {};
             alchemyStartTime = Date.now();//重置开始时间
@@ -525,7 +538,7 @@
         }
         showOutput();
     }
-    
+
     function updateAlchemyAction(action) {
         if ((!lastAction) || (lastAction.id != action.id)) {//新动作，重置统计信息
             lastAction = action;
@@ -573,13 +586,13 @@
         const h = Math.floor(seconds / 3600);
         const m = Math.floor((seconds % 3600) / 60);
         const s = Math.floor(seconds % 60);
-        
+
         return [
-          h.toString().padStart(2, '0'),
-          m.toString().padStart(2, '0'),
-          s.toString().padStart(2, '0')
+            h.toString().padStart(2, '0'),
+            m.toString().padStart(2, '0'),
+            s.toString().padStart(2, '0')
         ].join(':');
-      }
+    }
     function showOutput() {
         let alchemyContainer = document.querySelector(".SkillActionDetail_alchemyComponent__1J55d");
         if (!alchemyContainer) return;
@@ -587,9 +600,9 @@
         if (!document.querySelector("#alchemoo_result")) {
             let outputContainer = document.createElement("div");
             outputContainer.id = "alchemoo_result";
-            outputContainer.style.fontSize="13px";
+            outputContainer.style.fontSize = "13px";
             outputContainer.style.lineHeight = "16px";
-            outputContainer.style.maxWidth="220px";
+            outputContainer.style.maxWidth = "220px";
             outputContainer.innerHTML = `
             <div id="alchemoo_title" style="font-weight: bold; margin-bottom: 10px; text-align: center; color: var(--color-space-300);">炼金结果</div>
             <div id="alchemoo_cost" style="display: flex; flex-wrap: wrap; gap: 4px;"></div>
@@ -601,7 +614,7 @@
             <div id="alchemoo_time"></div>
             <div id="alchemoo_total" style="font-weight:bold;font-size:16px;border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;display: flex; flex-direction: column; align-items: flex-start; gap: 4px;"></div>
             `;
-            outputContainer.style.flex="0 0 auto";
+            outputContainer.style.flex = "0 0 auto";
             alchemyContainer.appendChild(outputContainer);
         }
         "💰"
@@ -620,16 +633,16 @@
         );
         let total = cost + gain;
 
-        let text ="";
+        let text = "";
         //消耗
         Object.entries(currentInput).forEach(([itemHash, count]) => {
             let item = itemHashToItem(itemHash);
             let price = getPrice(item.itemHrid);
             text += `
             <div title="直买价：${price.ask}" style="display: inline-flex;border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;">
-            <svg width="14px" height="14px" style="display:inline-block"><use href="/static/media/items_sprite.6d12eb9d.svg#${item.itemHrid.replace("/items/","")}"></use></svg>
+            <svg width="14px" height="14px" style="display:inline-block"><use href="/static/media/items_sprite.6d12eb9d.svg#${item.itemHrid.replace("/items/", "")}"></use></svg>
             <span style="display:inline-block">${getItemNameByHrid(item.itemHrid)}</span>
-            <span style="color:red;display:inline-block;font-size:14px;">${showNumber(count).replace("-","*")}</span>
+            <span style="color:red;display:inline-block;font-size:14px;">${showNumber(count).replace("-", "*")}</span>
             </div>
             `;
         });
@@ -638,19 +651,19 @@
 
         document.querySelector("#alchemoo_rate").innerHTML = `<br/>`;//成功率
 
-        text="";
+        text = "";
         Object.entries(currentOutput).forEach(([itemHash, count]) => {
             let item = itemHashToItem(itemHash);
             let price = getPrice(item.itemHrid);
             text += `
             <div title="直卖价：${price.bid}" style="display: inline-flex;border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;">
-            <svg width="14px" height="14px" style="display:inline-block"><use href="/static/media/items_sprite.6d12eb9d.svg#${item.itemHrid.replace("/items/","")}"></use></svg>
+            <svg width="14px" height="14px" style="display:inline-block"><use href="/static/media/items_sprite.6d12eb9d.svg#${item.itemHrid.replace("/items/", "")}"></use></svg>
             <span style="display:inline-block">${getItemNameByHrid(item.itemHrid)}</span>
-            <span style="color:lime;display:inline-block;font-size:14px;">${showNumber(count).replace("+","*")}</span>
+            <span style="color:lime;display:inline-block;font-size:14px;">${showNumber(count).replace("+", "*")}</span>
             </div>
             `;
         });
-        text+=`<div style="display: inline-block;border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;"><span style="color:lime;font-size:16px;">${showNumber(gain)}</span></div>`;
+        text += `<div style="display: inline-block;border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;"><span style="color:lime;font-size:16px;">${showNumber(gain)}</span></div>`;
         document.querySelector("#alchemoo_output").innerHTML = text;//产出
 
         //document.querySelector("#alchemoo_essence").innerHTML = `<br/>`;//精华
@@ -660,11 +673,12 @@
         //document.querySelector("#alchemoo_time").innerHTML = `<span>耗时:${secondsToHms(time)}</span>`;//时间
         let perDay = (86400 / time) * total;
 
-        document.querySelector("#alchemoo_total").innerHTML = 
-        `
+        let profitPerDay = predictPerDay[alchemyIndex] || 0;
+        document.querySelector("#alchemoo_total").innerHTML =
+            `
         <span>耗时:${secondsToHms(time)}</span>
         <div>累计收益:<span style="color:${total > 0 ? "lime" : "red"}">${showNumber(total)}</span></div>
-        <div>每日收益:<span style="color:${perDay>profitPerDay?"lime":"red"}">${showNumber(total*(86400/time)).replace("+",perDay>profitPerDay?"↑":"↓")}</span></div>
+        <div>每日收益:<span style="color:${perDay > profitPerDay ? "lime" : "red"}">${showNumber(total * (86400 / time)).replace("+", perDay > profitPerDay ? "↑" : "↓")}</span></div>
         `;//总收益
     }
     //mwi.hookMessage("action_completed", countAlchemyOutput);
