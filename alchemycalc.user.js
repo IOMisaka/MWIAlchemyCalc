@@ -587,16 +587,19 @@
         if (!document.querySelector("#alchemoo_result")) {
             let outputContainer = document.createElement("div");
             outputContainer.id = "alchemoo_result";
+            outputContainer.style.fontSize="13px";
+            outputContainer.style.lineHeight = "16px";
+            outputContainer.style.maxWidth="220px";
             outputContainer.innerHTML = `
             <div id="alchemoo_title" style="font-weight: bold; margin-bottom: 10px; text-align: center; color: var(--color-space-300);">炼金结果</div>
-            <div id="alchemoo_cost"></div>
+            <div id="alchemoo_cost" style="display: flex; flex-wrap: wrap; gap: 4px;"></div>
             <div id="alchemoo_rate"></div>
-            <div id="alchemoo_output"></div>
+            <div id="alchemoo_output" style="display: flex; flex-wrap: wrap; gap: 4px;"></div>
             <div id="alchemoo_essence"></div>
             <div id="alchemoo_rare"></div>
             <div id="alchemoo_exp"></div>
             <div id="alchemoo_time"></div>
-            <div id="alchemoo_total" style="border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;"></div>
+            <div id="alchemoo_total" style="font-weight:bold;font-size:16px;border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;display: flex; flex-direction: column; align-items: flex-start; gap: 4px;"></div>
             `;
             outputContainer.style.flex="0 0 auto";
             alchemyContainer.appendChild(outputContainer);
@@ -623,14 +626,14 @@
             let item = itemHashToItem(itemHash);
             let price = getPrice(item.itemHrid);
             text += `
-            <div title="直买价：${price.ask}" style="border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;">
+            <div title="直买价：${price.ask}" style="display: inline-flex;border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;">
             <svg width="14px" height="14px" style="display:inline-block"><use href="/static/media/items_sprite.6d12eb9d.svg#${item.itemHrid.replace("/items/","")}"></use></svg>
             <span style="display:inline-block">${getItemNameByHrid(item.itemHrid)}</span>
-            <span style="color:red" style="display:inline-block">${showNumber(count).replace("-","*")}</span>
+            <span style="color:red;display:inline-block;font-size:14px;">${showNumber(count).replace("-","*")}</span>
             </div>
             `;
         });
-        text += `<div>=<span style="color:red">${showNumber(cost)}</span></div>`;
+        text += `<div style="display: inline-block;border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;"><span style="color:red;font-size:16px;">${showNumber(cost)}</span></div>`;
         document.querySelector("#alchemoo_cost").innerHTML = text;
 
         document.querySelector("#alchemoo_rate").innerHTML = `<br/>`;//成功率
@@ -640,19 +643,19 @@
             let item = itemHashToItem(itemHash);
             let price = getPrice(item.itemHrid);
             text += `
-            <div title="直卖价：${price.bid}" style="border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;">
+            <div title="直卖价：${price.bid}" style="display: inline-flex;border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;">
             <svg width="14px" height="14px" style="display:inline-block"><use href="/static/media/items_sprite.6d12eb9d.svg#${item.itemHrid.replace("/items/","")}"></use></svg>
             <span style="display:inline-block">${getItemNameByHrid(item.itemHrid)}</span>
-            <span style="color:lime" style="display:inline-block">${showNumber(count).replace("+","*")}</span>
+            <span style="color:lime;display:inline-block;font-size:14px;">${showNumber(count).replace("+","*")}</span>
             </div>
             `;
         });
-        text+=`<div>=<span style="color:lime">${showNumber(gain)}</span></div>`;
+        text+=`<div style="display: inline-block;border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;"><span style="color:lime;font-size:16px;">${showNumber(gain)}</span></div>`;
         document.querySelector("#alchemoo_output").innerHTML = text;//产出
 
         //document.querySelector("#alchemoo_essence").innerHTML = `<br/>`;//精华
         //document.querySelector("#alchemoo_rare").innerHTML = `<br/>`;//稀有
-        //document.querySelector("#alchemoo_exp").innerHTML = `<br/>`;//经验
+        document.querySelector("#alchemoo_exp").innerHTML = `<br/>`;//经验
         let time = (Date.now() - alchemyStartTime) / 1000;
         //document.querySelector("#alchemoo_time").innerHTML = `<span>耗时:${secondsToHms(time)}</span>`;//时间
         let perDay = (86400 / time) * total;
