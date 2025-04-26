@@ -2,7 +2,7 @@
 // @name         MWIAlchemyCalc
 
 // @namespace    http://tampermonkey.net/
-// @version      20250425.2
+// @version      20250425.4
 // @description  显示炼金收益 milkywayidle 银河奶牛放置
 
 // @author       IOMisaka
@@ -95,13 +95,18 @@
                             let tempItems = {};
                             obj.endCharacterItems.forEach(
                                 item => {
+                                    
                                     let existItem = tempItems[item.id] || characterData.characterItems.find(x => x.id === item.id);
+
+                                    //console.log("炼金(old):",existItem.id,existItem.itemHrid, existItem.count);
+                                    //console.log("炼金(new):", item.id,item.itemHrid, item.count);
+
                                     let delta = (item.count - (existItem?.count || 0));//计数
-                                    if (delta < 0) {
-                                        inputHashCount[item.hash] = delta;
+                                    if (delta < 0) {//数量减少
+                                        inputHashCount[item.hash] = (inputHashCount[item.hash] || 0) + delta;//可能多次发送同一个物品
                                         tempItems[item.id] = item;//替换旧的物品计数
-                                    } else if (delta > 0) {
-                                        outputHashCount[item.hash] = delta;
+                                    } else if (delta > 0) {//数量增加
+                                        outputHashCount[item.hash] = (outputHashCount[item.hash] || 0) + delta;//可能多次发送同一个物品
                                         tempItems[item.id] = item;//替换旧的物品计数
                                     } else {
                                         console.log("炼金统计出错?不应该为0", item);
@@ -117,11 +122,9 @@
                         }
                     } catch (e) { }
 
-
-
                     let newIds = obj.endCharacterItems.map(i => i.id);
                     characterData.characterItems = characterData.characterItems.filter(e => !newIds.includes(e.id));//移除存在的物品
-                    characterData.characterItems.push(...obj.endCharacterItems);//放入新物品
+                    characterData.characterItems.push(...mergeObjectsById(obj.endCharacterItems));//放入新物品
                 }
                 if (obj.endCharacterSkills) {
                     for (let newSkill of obj.endCharacterSkills) {
@@ -135,12 +138,19 @@
                 if (obj.endCharacterItems) {//道具更新
                     let newIds = obj.endCharacterItems.map(i => i.id);
                     characterData.characterItems = characterData.characterItems.filter(e => !newIds.includes(e.id));//移除存在的物品
-                    characterData.characterItems.push(...obj.endCharacterItems);//放入新物品
+                    characterData.characterItems.push(...mergeObjectsById(obj.endCharacterItems));//放入新物品
                 }
             }
         }
         return message;
     }
+    function mergeObjectsById(list) {
+        return Object.values(list.reduce((acc, obj) => {
+          const id = obj.id;
+          acc[id] = { ...acc[id], ...obj }; // 后面的对象会覆盖前面的
+          return acc;
+        }, {}));
+      }
     /////////辅助函数,角色动态数据///////////
     // skillHrid = "/skills/alchemy"
     function getSkillLevel(skillHrid, withBuff = false) {
@@ -338,14 +348,14 @@
 
         }
         if (data.inputItems[0].itemHrid !== "/items/task_crystal") {//任务水晶有问题，暂时不计算
-            for (let item of data.essenceDrops) {//精华和宝箱都要算成功率 -> 不,这两个是按采集的时间出
+            for (let item of data.essenceDrops) {//精华和宝箱与成功率无关 消息id,10211754失败出精华！
                 essence += getPrice(item.itemHrid).bid * item.count;//采集数据的地方已经算进去了
             }
-            for (let item of data.rareDrops) {//宝箱也是按自己的几率出 -> 不
+            for (let item of data.rareDrops) {//宝箱也是按自己的几率出！
                 // getOpenableItems(item.itemHrid).forEach(openItem => {
                 //     rare += getPrice(openItem.itemHrid).bid * openItem.count * item.count;//已折算
                 // });
-                rare += getPrice(item.itemHrid).bid * item.count;
+                rare += getPrice(item.itemHrid).bid * item.count;//失败要出箱子，消息id，2793104转化，工匠茶失败出箱子了
             }
         }
         //催化剂
@@ -367,7 +377,7 @@
 
         return absNum >= 1e10 ? `${sign}${(num / 1e9).toFixed(1)}B` :
             absNum >= 1e7 ? `${sign}${(num / 1e6).toFixed(1)}M` :
-                absNum >= 1e4 ? `${sign}${Math.floor(num / 1e3)}K` :
+                absNum >= 1e5 ? `${sign}${Math.floor(num / 1e3)}K` :
                     `${sign}${Math.floor(num)}`;
     }
     function parseNumber(str) {
@@ -519,17 +529,10 @@
     let currentOutput = {};
     let alchemyStartTime = Date.now();
     let lastAction = null;
-    let needClear = false;
     let alchemyIndex = 0;
     //统计功能
     function countAlchemyOutput(inputHashCount, outputHashCount, index) {
         alchemyIndex = index;
-        if (needClear) {
-            currentOutput = {};
-            currentInput = {};
-            alchemyStartTime = Date.now();//重置开始时间
-            needClear = false;
-        }
         for (let itemHash in inputHashCount) {
             currentInput[itemHash] = (currentInput[itemHash] || 0) + inputHashCount[itemHash];
         }
@@ -542,9 +545,9 @@
     function updateAlchemyAction(action) {
         if ((!lastAction) || (lastAction.id != action.id)) {//新动作，重置统计信息
             lastAction = action;
-            needClear = true;
-            showOutput();//显示统计信息
-            return;
+            currentOutput = {};
+            currentInput = {};
+            alchemyStartTime = Date.now();//重置开始时间
         }
         showOutput();
     }
