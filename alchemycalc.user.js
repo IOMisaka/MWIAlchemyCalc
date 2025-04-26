@@ -2,7 +2,7 @@
 // @name         MWIAlchemyCalc
 
 // @namespace    http://tampermonkey.net/
-// @version      20250425.5
+// @version      20250425.6
 // @description  显示炼金收益和产出统计 milkywayidle 银河奶牛放置
 
 // @author       IOMisaka
@@ -324,7 +324,7 @@
     }
     let includeRare = false;
     //计算每次的收益
-    function calculateProfit(data) {
+    function calculateProfit(data,isIronCowinify=false) {
         let profit = 0;
         let input = 0;
         let output = 0;
@@ -365,11 +365,20 @@
             catalyst -= getPrice(item.itemHrid).ask * item.count * data.successRate;//买入材料价格*数量
         }
 
-        profit = input + tea + output + essence + rare + catalyst;
-        let description = `Last Update：${new Date(marketData.time * 1000).toLocaleString()}\n(效率+${(data.effeciency * 100).toFixed(2)}%)每次收益${profit}=\n\t材料(${input})\n\t茶(${tea})\n\t催化剂(${catalyst})\n\t产出(${output})\n\t精华(${essence})\n\t稀有(${rare})`;
+        let description="";
+        if (isIronCowinify) {//铁牛不计算输入
+            profit = tea + output + essence + rare + catalyst;
+            description = `Last Update：${new Date(marketData.time * 1000).toLocaleString()}\n(效率+${(data.effeciency * 100).toFixed(2)}%)每次收益${profit}=\n\t材料(${input})[不计入]\n\t茶(${tea})\n\t催化剂(${catalyst})\n\t产出(${output})\n\t精华(${essence})\n\t稀有(${rare})`;
+            
+        }else{
+            profit = input + tea + output + essence + rare + catalyst;
+            description = `Last Update：${new Date(marketData.time * 1000).toLocaleString()}\n(效率+${(data.effeciency * 100).toFixed(2)}%)每次收益${profit}=\n\t材料(${input})\n\t茶(${tea})\n\t催化剂(${catalyst})\n\t产出(${output})\n\t精华(${essence})\n\t稀有(${rare})`;
+        }
+        
         //console.info(description);
         return [profit, description];//再乘以次数
     }
+    
     function showNumber(num) {
         if (isNaN(num)) return num;
         if (num === 0) return "0";// 单独处理0的情况
@@ -478,9 +487,13 @@
             catalystItems: catalystItems,
             effeciency: effeciency,
         }
-
+        const buttons = document.querySelectorAll(".AlchemyPanel_tabsComponentContainer__1f7FY .MuiButtonBase-root.MuiTab-root.MuiTab-textColorPrimary.css-1q2h7u5");
+        const selectedIndex = Array.from(buttons).findIndex(button =>
+            button.classList.contains('Mui-selected')
+        );
+        let isIronCowinify = selectedIndex==0&&mwi.character?.gameMode==="ironcow";//铁牛点金
         //次数,收益
-        let result = calculateProfit(ret);
+        let result = calculateProfit(ret,isIronCowinify);
         let profit = result[0];
         let desc = result[1];
 
@@ -489,11 +502,7 @@
 
         let timesPerDay = 24 * timesPerHour;
         let profitPerDay = profit * timesPerDay;
-
-        const buttons = document.querySelectorAll(".AlchemyPanel_tabsComponentContainer__1f7FY .MuiButtonBase-root.MuiTab-root.MuiTab-textColorPrimary.css-1q2h7u5");
-        const selectedIndex = Array.from(buttons).findIndex(button =>
-            button.classList.contains('Mui-selected')
-        );
+        
         predictPerDay[selectedIndex] = profitPerDay;//记录第几个对应的每日收益
 
         observer?.disconnect();//断开观察
