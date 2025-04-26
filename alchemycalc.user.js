@@ -76,22 +76,23 @@
                 characterData.houseActionTypeBuffsMap = obj.houseActionTypeBuffsMap;
             }
             else if (obj.type === "actions_updated") {
-                obj.endCharacterActions?.forEach(
-                    action => {
-                        if (action.actionHrid.startsWith("/actions/alchemy")) {
-                            updateAlchemyAction(action);
-                        } else {
-                            alchemyIndex = -1;
-                        }
+                //延迟检测
+                setTimeout(() => {
+                    let firstAction = mwi.game?.state?.characterActions[0];
+                    if(firstAction && firstAction.actionHrid.startsWith("/actions/alchemy")){
+                        updateAlchemyAction(firstAction);
                     }
-                );
-
+                }, 100);
+                
+                
             }
             else if (obj.type === "action_completed") {//更新技能等级和经验
                 if (obj.endCharacterItems) {//道具更新
                     //炼金统计
                     try {
                         if (obj.endCharacterAction.actionHrid.startsWith("/actions/alchemy")) {//炼金统计
+                            updateAlchemyAction(obj.endCharacterAction);
+
                             let outputHashCount = {};
                             let inputHashCount = {};
                             let tempItems = {};
@@ -121,6 +122,8 @@
                                 "/actions/alchemy/transmute"
                             ].findIndex(x => x === obj.endCharacterAction.actionHrid);
                             countAlchemyOutput(inputHashCount, outputHashCount, index);
+                        }else{
+                            alchemyIndex = -1;//不是炼金
                         }
                     } catch (e) { }
 
