@@ -3,7 +3,7 @@
 
 // @namespace    http://tampermonkey.net/
 // @version      20250425.5
-// @description  显示炼金收益 milkywayidle 银河奶牛放置
+// @description  显示炼金收益和产出统计 milkywayidle 银河奶牛放置
 
 // @author       IOMisaka
 // @match        https://www.milkywayidle.com/*
