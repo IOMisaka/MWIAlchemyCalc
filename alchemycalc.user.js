@@ -524,7 +524,7 @@
         }
         label.innerHTML = `
         <div id="alchemoo" style="color: ${color};">
-            <span title="${desc}">预估收益ℹ️：</span><input type="checkbox" id="alchemoo_includeRare"/><label for="alchemoo_excludeRate">稀有掉落</label><br/>
+            <span title="${desc}">预估收益ℹ️：</span><input type="checkbox" id="alchemoo_includeRare"/><label for="alchemoo_includeRare">稀有掉落</label><br/>
             <span>🪙${showNumber(profit)}/次</span><br/>
             <span title="${showNumber(timesPerHour)}次">🪙${showNumber(profitPerHour)}/时</span><br/>
             <span title="${showNumber(timesPerDay)}次">🪙${showNumber(profitPerDay)}/天</span>
