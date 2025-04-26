@@ -2,7 +2,7 @@
 // @name         MWIAlchemyCalc
 
 // @namespace    http://tampermonkey.net/
-// @version      20250425.4
+// @version      20250425.5
 // @description  显示炼金收益 milkywayidle 银河奶牛放置
 
 // @author       IOMisaka
@@ -95,7 +95,7 @@
                             let tempItems = {};
                             obj.endCharacterItems.forEach(
                                 item => {
-                                    
+
                                     let existItem = tempItems[item.id] || characterData.characterItems.find(x => x.id === item.id);
 
                                     //console.log("炼金(old):",existItem.id,existItem.itemHrid, existItem.count);
@@ -146,11 +146,11 @@
     }
     function mergeObjectsById(list) {
         return Object.values(list.reduce((acc, obj) => {
-          const id = obj.id;
-          acc[id] = { ...acc[id], ...obj }; // 后面的对象会覆盖前面的
-          return acc;
+            const id = obj.id;
+            acc[id] = { ...acc[id], ...obj }; // 后面的对象会覆盖前面的
+            return acc;
         }, {}));
-      }
+    }
     /////////辅助函数,角色动态数据///////////
     // skillHrid = "/skills/alchemy"
     function getSkillLevel(skillHrid, withBuff = false) {
@@ -322,7 +322,7 @@
     function getPrice(itemHrid, enhancementLevel = 0) {
         return mwi.coreMarket.getItemPrice(itemHrid, enhancementLevel);
     }
-
+    let includeRare = false;
     //计算每次的收益
     function calculateProfit(data) {
         let profit = 0;
@@ -351,11 +351,13 @@
             for (let item of data.essenceDrops) {//精华和宝箱与成功率无关 消息id,10211754失败出精华！
                 essence += getPrice(item.itemHrid).bid * item.count;//采集数据的地方已经算进去了
             }
-            for (let item of data.rareDrops) {//宝箱也是按自己的几率出！
-                // getOpenableItems(item.itemHrid).forEach(openItem => {
-                //     rare += getPrice(openItem.itemHrid).bid * openItem.count * item.count;//已折算
-                // });
-                rare += getPrice(item.itemHrid).bid * item.count;//失败要出箱子，消息id，2793104转化，工匠茶失败出箱子了
+            if (includeRare) {//排除宝箱，因为几率过低，严重影响收益显示
+                for (let item of data.rareDrops) {//宝箱也是按自己的几率出！
+                    // getOpenableItems(item.itemHrid).forEach(openItem => {
+                    //     rare += getPrice(openItem.itemHrid).bid * openItem.count * item.count;//已折算
+                    // });
+                    rare += getPrice(item.itemHrid).bid * item.count;//失败要出箱子，消息id，2793104转化，工匠茶失败出箱子了
+                }
             }
         }
         //催化剂
@@ -513,13 +515,18 @@
         }
         label.innerHTML = `
         <div id="alchemoo" style="color: ${color};">
-            <span title="${desc}">预估收益ℹ️：</span><br/>
+            <span title="${desc}">预估收益ℹ️：</span><input type="checkbox" id="alchemoo_includeRare"/><label for="alchemoo_excludeRate">稀有掉落</label><br/>
             <span>🪙${showNumber(profit)}/次</span><br/>
             <span title="${showNumber(timesPerHour)}次">🪙${showNumber(profitPerHour)}/时</span><br/>
             <span title="${showNumber(timesPerDay)}次">🪙${showNumber(profitPerDay)}/天</span>
             </div>`;
+        document.querySelector("#alchemoo_includeRare").checked = includeRare;
+        document.querySelector("#alchemoo_includeRare").addEventListener("change", function () {
+            includeRare=this.checked;
+            handleAlchemyDetailChanged();//重新计算
+        });
 
-        //console.log(ret);
+            //console.log(ret);
         observer?.reobserve();
     }
 
@@ -681,7 +688,7 @@
             `
         <span>耗时:${secondsToHms(time)}</span>
         <div>累计收益:<span style="color:${total > 0 ? "lime" : "red"}">${showNumber(total)}</span></div>
-        <div>每日收益:<span style="color:${perDay > profitPerDay ? "lime" : "red"}">${showNumber(total * (86400 / time)).replace("+", perDay > profitPerDay ? "↑" : "↓")}</span></div>
+        <div>每日收益:<span style="color:${perDay > profitPerDay ? "lime" : "red"}">${showNumber(total * (86400 / time)).replace("+", "")}</span></div>
         `;//总收益
     }
     //mwi.hookMessage("action_completed", countAlchemyOutput);
