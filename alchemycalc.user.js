@@ -2,7 +2,7 @@
 // @name         MWIAlchemyCalc
 
 // @namespace    http://tampermonkey.net/
-// @version      20250425.6
+// @version      20250425.7
 // @description  显示炼金收益和产出统计 milkywayidle 银河奶牛放置
 
 // @author       IOMisaka
@@ -336,7 +336,7 @@
 
         for (let item of data.inputItems) {//消耗物品每次必定消耗
 
-            input -= getPrice(item.itemHrid).ask * item.count;//买入材料价格*数量
+            input -= getPrice(item.itemHrid,item.enhancementLevel).ask * item.count;//买入材料价格*数量
 
         }
         for (let item of data.teaUsage) {//茶每次必定消耗
