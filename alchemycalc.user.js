@@ -50,7 +50,7 @@
             clientData = obj;
         }
     }
-
+    let alchemyIndex = 0;
     function handleMessage(message) {
         let obj = JSON.parse(message);
         if (obj) {
@@ -80,6 +80,8 @@
                     action => {
                         if (action.actionHrid.startsWith("/actions/alchemy")) {
                             updateAlchemyAction(action);
+                        } else {
+                            alchemyIndex = -1;
                         }
                     }
                 );
@@ -324,7 +326,7 @@
     }
     let includeRare = false;
     //计算每次的收益
-    function calculateProfit(data,isIronCowinify=false) {
+    function calculateProfit(data, isIronCowinify = false) {
         let profit = 0;
         let input = 0;
         let output = 0;
@@ -336,7 +338,7 @@
 
         for (let item of data.inputItems) {//消耗物品每次必定消耗
 
-            input -= getPrice(item.itemHrid,item.enhancementLevel).ask * item.count;//买入材料价格*数量
+            input -= getPrice(item.itemHrid, item.enhancementLevel).ask * item.count;//买入材料价格*数量
 
         }
         for (let item of data.teaUsage) {//茶每次必定消耗
@@ -365,20 +367,20 @@
             catalyst -= getPrice(item.itemHrid).ask * item.count * data.successRate;//买入材料价格*数量
         }
 
-        let description="";
+        let description = "";
         if (isIronCowinify) {//铁牛不计算输入
             profit = tea + output + essence + rare + catalyst;
             description = `Last Update：${new Date(marketData.time * 1000).toLocaleString()}\n(效率+${(data.effeciency * 100).toFixed(2)}%)每次收益${profit}=\n\t材料(${input})[不计入]\n\t茶(${tea})\n\t催化剂(${catalyst})\n\t产出(${output})\n\t精华(${essence})\n\t稀有(${rare})`;
-            
-        }else{
+
+        } else {
             profit = input + tea + output + essence + rare + catalyst;
             description = `Last Update：${new Date(marketData.time * 1000).toLocaleString()}\n(效率+${(data.effeciency * 100).toFixed(2)}%)每次收益${profit}=\n\t材料(${input})\n\t茶(${tea})\n\t催化剂(${catalyst})\n\t产出(${output})\n\t精华(${essence})\n\t稀有(${rare})`;
         }
-        
+
         //console.info(description);
         return [profit, description];//再乘以次数
     }
-    
+
     function showNumber(num) {
         if (isNaN(num)) return num;
         if (num === 0) return "0";// 单独处理0的情况
@@ -491,9 +493,9 @@
         const selectedIndex = Array.from(buttons).findIndex(button =>
             button.classList.contains('Mui-selected')
         );
-        let isIronCowinify = selectedIndex==0&&mwi.character?.gameMode==="ironcow";//铁牛点金
+        let isIronCowinify = (selectedIndex == 0 || (selectedIndex == 3 && alchemyIndex == 0)) && mwi.character?.gameMode === "ironcow";//铁牛点金
         //次数,收益
-        let result = calculateProfit(ret,isIronCowinify);
+        let result = calculateProfit(ret, isIronCowinify);
         let profit = result[0];
         let desc = result[1];
 
@@ -502,7 +504,7 @@
 
         let timesPerDay = 24 * timesPerHour;
         let profitPerDay = profit * timesPerDay;
-        
+
         predictPerDay[selectedIndex] = profitPerDay;//记录第几个对应的每日收益
 
         observer?.disconnect();//断开观察
@@ -531,11 +533,11 @@
             </div>`;
         document.querySelector("#alchemoo_includeRare").checked = includeRare;
         document.querySelector("#alchemoo_includeRare").addEventListener("change", function () {
-            includeRare=this.checked;
+            includeRare = this.checked;
             handleAlchemyDetailChanged();//重新计算
         });
 
-            //console.log(ret);
+        //console.log(ret);
         observer?.reobserve();
     }
 
@@ -545,7 +547,7 @@
     let currentOutput = {};
     let alchemyStartTime = Date.now();
     let lastAction = null;
-    let alchemyIndex = 0;
+
     //统计功能
     function countAlchemyOutput(inputHashCount, outputHashCount, index) {
         alchemyIndex = index;
@@ -650,6 +652,7 @@
                 return { "itemHrid": arr[2], "enhancementLevel": parseInt(arr[3]), "count": count }
             })
         );
+        if (alchemyIndex == 0 && mwi.character?.gameMode === "ironcow") { cost = 0 };//铁牛点金，不计算成本
         let total = cost + gain;
 
         let text = "";
@@ -665,7 +668,9 @@
             </div>
             `;
         });
-        text += `<div style="display: inline-block;border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;"><span style="color:red;font-size:16px;">${showNumber(cost)}</span></div>`;
+        if (cost > 0) {//0不显示
+            text += `<div style="display: inline-block;border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;"><span style="color:red;font-size:16px;">${showNumber(cost)}</span></div>`;
+        }
         document.querySelector("#alchemoo_cost").innerHTML = text;
 
         document.querySelector("#alchemoo_rate").innerHTML = `<br/>`;//成功率
