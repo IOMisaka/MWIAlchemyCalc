@@ -2,7 +2,7 @@
 // @name         MWIAlchemyCalc
 
 // @namespace    http://tampermonkey.net/
-// @version      20250425.9
+// @version      20250427.1
 // @description  显示炼金收益和产出统计 milkywayidle 银河奶牛放置
 
 // @author       IOMisaka
@@ -529,11 +529,22 @@
         }
         label.innerHTML = `
         <div id="alchemoo" style="color: ${color};">
-            <span title="${desc}">预估收益ℹ️：</span><input type="checkbox" id="alchemoo_includeRare"/><label for="alchemoo_includeRare">稀有掉落</label><br/>
-            <span>🪙${showNumber(profit)}/次</span><br/>
-            <span title="${showNumber(timesPerHour)}次">🪙${showNumber(profitPerHour)}/时</span><br/>
-            <span title="${showNumber(timesPerDay)}次">🪙${showNumber(profitPerDay)}/天</span>
-            </div>`;
+            <div>
+                <span title="${desc}">预估收益ℹ️：</span><input type="checkbox" id="alchemoo_includeRare"/><label for="alchemoo_includeRare">稀有掉落</label>
+            </div>
+            <div>
+                <svg width="14px" height="14px" style="display:inline-block"><use href="/static/media/items_sprite.6d12eb9d.svg#coin"></use></svg>
+                <span>${showNumber(profit)}/次</span>
+            </div>
+            <div>
+                <svg width="14px" height="14px" style="display:inline-block"><use href="/static/media/items_sprite.6d12eb9d.svg#coin"></use></svg>
+                <span title="${showNumber(timesPerHour)}次">${showNumber(profitPerHour)}/时</span>
+            </div>
+            <div>
+                <svg width="14px" height="14px" style="display:inline-block"><use href="/static/media/items_sprite.6d12eb9d.svg#coin"></use></svg>
+                <span title="${showNumber(timesPerDay)}次">${showNumber(profitPerDay)}/天</span>
+            </div>
+        </div>`;
         document.querySelector("#alchemoo_includeRare").checked = includeRare;
         document.querySelector("#alchemoo_includeRare").addEventListener("change", function () {
             includeRare = this.checked;
