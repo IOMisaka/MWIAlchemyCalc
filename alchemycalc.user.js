@@ -2,7 +2,7 @@
 // @name         MWIAlchemyCalc
 
 // @namespace    http://tampermonkey.net/
-// @version      20250425.8
+// @version      20250425.9
 // @description  显示炼金收益和产出统计 milkywayidle 银河奶牛放置
 
 // @author       IOMisaka
@@ -79,12 +79,12 @@
                 //延迟检测
                 setTimeout(() => {
                     let firstAction = mwi.game?.state?.characterActions[0];
-                    if(firstAction && firstAction.actionHrid.startsWith("/actions/alchemy")){
+                    if (firstAction && firstAction.actionHrid.startsWith("/actions/alchemy")) {
                         updateAlchemyAction(firstAction);
                     }
                 }, 100);
-                
-                
+
+
             }
             else if (obj.type === "action_completed") {//更新技能等级和经验
                 if (obj.endCharacterItems) {//道具更新
@@ -122,7 +122,7 @@
                                 "/actions/alchemy/transmute"
                             ].findIndex(x => x === obj.endCharacterAction.actionHrid);
                             countAlchemyOutput(inputHashCount, outputHashCount, index);
-                        }else{
+                        } else {
                             alchemyIndex = -1;//不是炼金
                         }
                     } catch (e) { }
@@ -690,7 +690,9 @@
             </div>
             `;
         });
-        text += `<div style="display: inline-block;border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;"><span style="color:lime;font-size:16px;">${showNumber(gain)}</span></div>`;
+        if (gain > 0) {//0不显示
+            text += `<div style="display: inline-block;border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;"><span style="color:lime;font-size:16px;">${showNumber(gain)}</span></div>`;
+        }
         document.querySelector("#alchemoo_output").innerHTML = text;//产出
 
         //document.querySelector("#alchemoo_essence").innerHTML = `<br/>`;//精华
