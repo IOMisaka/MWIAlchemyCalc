@@ -2,7 +2,7 @@
 // @name         MWIAlchemyCalc
 
 // @namespace    http://tampermonkey.net/
-// @version      20250427.1
+// @version      20250430.1
 // @description  显示炼金收益和产出统计 milkywayidle 银河奶牛放置
 
 // @author       IOMisaka
@@ -254,7 +254,7 @@
         }
         console.info(`observing "${rootSelector}"`);
 
-        function delayCall(func, observer, delay = 100) {
+        function delayCall(func, observer, delay = 200) {
             //判断func是function类型
             if (typeof func !== 'function') return;
             // 延迟执行，如果再次调用则在原有基础上继续延时
@@ -285,8 +285,10 @@
                     }
 
                 } else if (mutation.type === 'characterData') {
+                    let node = mutation.target.matches(nodeSelector) ? mutation.target : mutation.target.closest(nodeSelector);
                     // 文本内容变化（如文本节点修改）
-                    delayCall(updateFunc, observer);
+                    if(node)
+                        delayCall(updateFunc, observer);
                 }
             });
         });
@@ -328,6 +330,7 @@
         return mwi.coreMarket.getItemPrice(itemHrid, enhancementLevel);
     }
     let includeRare = false;
+    let priceMode = "ba";//左买右卖
     //计算每次的收益
     function calculateProfit(data, isIronCowinify = false) {
         let profit = 0;
@@ -338,36 +341,43 @@
         let tea = 0;
         let catalyst = 0;
 
+        const mode = {
+            "ab":["ask","bid"],
+            "ba":["bid","ask"],
+            "aa":["ask","ask"],
+            "bb":["bid","bid"],
+        };
+        let [buyPrice,sellPrice] = mode[priceMode];
 
         for (let item of data.inputItems) {//消耗物品每次必定消耗
 
-            input -= getPrice(item.itemHrid, item.enhancementLevel).ask * item.count;//买入材料价格*数量
+            input -= getPrice(item.itemHrid, item.enhancementLevel)[buyPrice] * item.count;//买入材料价格*数量
 
         }
         for (let item of data.teaUsage) {//茶每次必定消耗
-            tea -= getPrice(item.itemHrid).ask * item.count;//买入材料价格*数量
+            tea -= getPrice(item.itemHrid)[buyPrice] * item.count;//买入材料价格*数量
         }
 
         for (let item of data.outputItems) {//产出物品每次不一定产出，需要计算成功率
-            output += getPrice(item.itemHrid).bid * item.count * data.successRate;//卖出产出价格*数量*成功率
+            output += getPrice(item.itemHrid)[sellPrice] * item.count * data.successRate * 0.98;//卖出产出价格*数量*成功率*税后
 
         }
         if (data.inputItems[0].itemHrid !== "/items/task_crystal") {//任务水晶有问题，暂时不计算
             for (let item of data.essenceDrops) {//精华和宝箱与成功率无关 消息id,10211754失败出精华！
-                essence += getPrice(item.itemHrid).bid * item.count;//采集数据的地方已经算进去了
+                essence += getPrice(item.itemHrid)[sellPrice] * item.count *0.98;//采集数据的地方已经算进去了
             }
             if (includeRare) {//排除宝箱，因为几率过低，严重影响收益显示
                 for (let item of data.rareDrops) {//宝箱也是按自己的几率出！
                     // getOpenableItems(item.itemHrid).forEach(openItem => {
                     //     rare += getPrice(openItem.itemHrid).bid * openItem.count * item.count;//已折算
                     // });
-                    rare += getPrice(item.itemHrid).bid * item.count;//失败要出箱子，消息id，2793104转化，工匠茶失败出箱子了
+                    rare += getPrice(item.itemHrid)[sellPrice] * item.count*0.98;//失败要出箱子，消息id，2793104转化，工匠茶失败出箱子了
                 }
             }
         }
         //催化剂
         for (let item of data.catalystItems) {//催化剂,成功才会用
-            catalyst -= getPrice(item.itemHrid).ask * item.count * data.successRate;//买入材料价格*数量
+            catalyst -= getPrice(item.itemHrid)[buyPrice] * item.count * data.successRate;//买入材料价格*数量
         }
 
         let description = "";
@@ -530,7 +540,13 @@
         label.innerHTML = `
         <div id="alchemoo" style="color: ${color};">
             <div>
-                <span title="${desc}">预估收益ℹ️：</span><input type="checkbox" id="alchemoo_includeRare"/><label for="alchemoo_includeRare">稀有掉落</label>
+                <span title="（2%税后）\n${desc}">预估收益ℹ️：</span><input type="checkbox" id="alchemoo_includeRare"/><label for="alchemoo_includeRare">稀有</label>
+                <select id="alchemoo_selectMode">
+                    <option value="ab">左买右卖</option>
+                    <option value="ba">右买左卖</option>
+                    <option value="aa">左买左卖</option>
+                    <option value="bb">右买右卖</option>
+                </select>
             </div>
             <div>
                 <svg width="14px" height="14px" style="display:inline-block"><use href="/static/media/items_sprite.6d12eb9d.svg#coin"></use></svg>
@@ -548,6 +564,11 @@
         document.querySelector("#alchemoo_includeRare").checked = includeRare;
         document.querySelector("#alchemoo_includeRare").addEventListener("change", function () {
             includeRare = this.checked;
+            handleAlchemyDetailChanged();//重新计算
+        });
+        document.querySelector("#alchemoo_selectMode").value = priceMode;
+        document.querySelector("#alchemoo_selectMode").addEventListener("change", function () {
+            priceMode = this.value;
             handleAlchemyDetailChanged();//重新计算
         });
 
