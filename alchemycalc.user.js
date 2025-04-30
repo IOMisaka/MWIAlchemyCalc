@@ -2,7 +2,7 @@
 // @name         MWIAlchemyCalc
 
 // @namespace    http://tampermonkey.net/
-// @version      20250430.1
+// @version      20250430.2
 // @description  显示炼金收益和产出统计 milkywayidle 银河奶牛放置
 
 // @author       IOMisaka
@@ -330,7 +330,7 @@
         return mwi.coreMarket.getItemPrice(itemHrid, enhancementLevel);
     }
     let includeRare = false;
-    let priceMode = "ba";//左买右卖
+    let priceMode = "ab";//左买右卖
     //计算每次的收益
     function calculateProfit(data, isIronCowinify = false) {
         let profit = 0;
