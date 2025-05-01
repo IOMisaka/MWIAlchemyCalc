@@ -2,7 +2,7 @@
 // @name         MWIAlchemyCalc
 
 // @namespace    http://tampermonkey.net/
-// @version      20250430.2
+// @version      20250430.3
 // @description  显示炼金收益和产出统计 milkywayidle 银河奶牛放置
 
 // @author       IOMisaka
@@ -285,10 +285,8 @@
                     }
 
                 } else if (mutation.type === 'characterData') {
-                    let node = mutation.target?.matches(nodeSelector) ? mutation.target : mutation.target.closest(nodeSelector);
                     // 文本内容变化（如文本节点修改）
-                    if(node)
-                        delayCall(updateFunc, observer);
+                    delayCall(updateFunc, observer);
                 }
             });
         });
