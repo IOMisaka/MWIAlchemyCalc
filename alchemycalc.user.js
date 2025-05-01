@@ -2,7 +2,7 @@
 // @name         MWIAlchemyCalc
 
 // @namespace    http://tampermonkey.net/
-// @version      20250430.3
+// @version      20250501.1
 // @description  显示炼金收益和产出统计 milkywayidle 银河奶牛放置
 
 // @author       IOMisaka
@@ -330,7 +330,7 @@
     let includeRare = false;
     let priceMode = "ab";//左买右卖
     //计算每次的收益
-    function calculateProfit(data, isIronCowinify = false) {
+    function calculateProfit(data, isIroncow = false, isCoinify = false) {
         let profit = 0;
         let input = 0;
         let output = 0;
@@ -338,14 +338,15 @@
         let rare = 0;
         let tea = 0;
         let catalyst = 0;
+        let tax = isIroncow ? 1 : 0.98;//铁牛不扣税
 
         const mode = {
-            "ab":["ask","bid"],
-            "ba":["bid","ask"],
-            "aa":["ask","ask"],
-            "bb":["bid","bid"],
+            "ab": ["ask", "bid"],
+            "ba": ["bid", "ask"],
+            "aa": ["ask", "ask"],
+            "bb": ["bid", "bid"],
         };
-        let [buyPrice,sellPrice] = mode[priceMode];
+        let [buyPrice, sellPrice] = mode[priceMode];
 
         for (let item of data.inputItems) {//消耗物品每次必定消耗
 
@@ -357,19 +358,19 @@
         }
 
         for (let item of data.outputItems) {//产出物品每次不一定产出，需要计算成功率
-            output += getPrice(item.itemHrid)[sellPrice] * item.count * data.successRate * 0.98;//卖出产出价格*数量*成功率*税后
+            output += getPrice(item.itemHrid)[sellPrice] * item.count * data.successRate * tax;//卖出产出价格*数量*成功率*税后
 
         }
         if (data.inputItems[0].itemHrid !== "/items/task_crystal") {//任务水晶有问题，暂时不计算
             for (let item of data.essenceDrops) {//精华和宝箱与成功率无关 消息id,10211754失败出精华！
-                essence += getPrice(item.itemHrid)[sellPrice] * item.count *0.98;//采集数据的地方已经算进去了
+                essence += getPrice(item.itemHrid)[sellPrice] * item.count * tax;//采集数据的地方已经算进去了
             }
             if (includeRare) {//排除宝箱，因为几率过低，严重影响收益显示
                 for (let item of data.rareDrops) {//宝箱也是按自己的几率出！
                     // getOpenableItems(item.itemHrid).forEach(openItem => {
                     //     rare += getPrice(openItem.itemHrid).bid * openItem.count * item.count;//已折算
                     // });
-                    rare += getPrice(item.itemHrid)[sellPrice] * item.count*0.98;//失败要出箱子，消息id，2793104转化，工匠茶失败出箱子了
+                    rare += getPrice(item.itemHrid)[sellPrice] * item.count * tax;//失败要出箱子，消息id，2793104转化，工匠茶失败出箱子了
                 }
             }
         }
@@ -379,13 +380,31 @@
         }
 
         let description = "";
-        if (isIronCowinify) {//铁牛不计算输入
+        if (isIroncow && isCoinify) {//铁牛点金不计算输入
             profit = tea + output + essence + rare + catalyst;
-            description = `Last Update：${new Date(marketData.time * 1000).toLocaleString()}\n(效率+${(data.effeciency * 100).toFixed(2)}%)每次收益${profit}=\n\t材料(${input})[不计入]\n\t茶(${tea})\n\t催化剂(${catalyst})\n\t产出(${output})\n\t精华(${essence})\n\t稀有(${rare})`;
+            description = `Last Update：${new Date(marketData.time * 1000).toLocaleString()}
+(${mwi.isZh ? "税" : "tax"}${isIroncow ? "0" : "2%"})
+(${mwi.isZh ? "效率" : "effeciency"}+${(data.effeciency * 100).toFixed(2)}%)
+${mwi.isZh ? "每次收益" : "each"}:${profit}=
+\t${mwi.isZh ? "材料" : "material"}(${input})[${mwi.isZh ? "铁牛点金不计入" : "not included for ironcowinify"}]
+\t${mwi.isZh ? "茶" : "tea"}(${tea})
+\t${mwi.isZh ? "催化剂" : "catalyst"}(${catalyst})
+\t${mwi.isZh ? "产出" : "output"}(${output})
+\t${mwi.isZh ? "精华" : "essence"}(${essence})
+\t${mwi.isZh ? "稀有" : "rare"}(${rare})`;
 
         } else {
             profit = input + tea + output + essence + rare + catalyst;
-            description = `Last Update：${new Date(marketData.time * 1000).toLocaleString()}\n(效率+${(data.effeciency * 100).toFixed(2)}%)每次收益${profit}=\n\t材料(${input})\n\t茶(${tea})\n\t催化剂(${catalyst})\n\t产出(${output})\n\t精华(${essence})\n\t稀有(${rare})`;
+            description = `Last Update：${new Date(marketData.time * 1000).toLocaleString()}
+(${mwi.isZh ? "税" : "tax"}${isIroncow ? "0" : "2%"})
+(${mwi.isZh ? "效率" : "effeciency"}+${(data.effeciency * 100).toFixed(2)}%)
+${mwi.isZh ? "每次收益" : "each"}:${profit}=
+\t${mwi.isZh ? "材料" : "material"}(${input})
+\t${mwi.isZh ? "茶" : "tea"}(${tea})
+\t${mwi.isZh ? "催化剂" : "catalyst"}(${catalyst})
+\t${mwi.isZh ? "产出" : "output"}(${output})
+\t${mwi.isZh ? "精华" : "essence"}(${essence})
+\t${mwi.isZh ? "稀有" : "rare"}(${rare})`;
         }
 
         //console.info(description);
@@ -504,9 +523,10 @@
         const selectedIndex = Array.from(buttons).findIndex(button =>
             button.classList.contains('Mui-selected')
         );
-        let isIronCowinify = (selectedIndex == 0 || (selectedIndex == 3 && alchemyIndex == 0)) && mwi.character?.gameMode === "ironcow";//铁牛点金
+        let isCowinify = (selectedIndex == 0 || (selectedIndex == 3 && alchemyIndex == 0));//点金模式
+
         //次数,收益
-        let result = calculateProfit(ret, isIronCowinify);
+        let result = calculateProfit(ret, mwi.character?.gameMode === "ironcow", isCowinify);
         let profit = result[0];
         let desc = result[1];
 
@@ -538,25 +558,25 @@
         label.innerHTML = `
         <div id="alchemoo" style="color: ${color};">
             <div>
-                <span title="（2%税后）\n${desc}">预估收益ℹ️：</span><input type="checkbox" id="alchemoo_includeRare"/><label for="alchemoo_includeRare">稀有</label>
+                <span title="${desc}">${mwi.isZh ? "预估收益" : "Profit"}ℹ️：</span><input type="checkbox" id="alchemoo_includeRare"/><label for="alchemoo_includeRare">${mwi.isZh ? "稀有" : "Rares"}</label>
                 <select id="alchemoo_selectMode">
-                    <option value="ab">左买右卖</option>
-                    <option value="ba">右买左卖</option>
-                    <option value="aa">左买左卖</option>
-                    <option value="bb">右买右卖</option>
+                    <option value="ab">${mwi.isZh ? "左买右卖" : "ask in,bid out"}</option>
+                    <option value="ba">${mwi.isZh ? "右买左卖" : "bid in,ask out"}</option>
+                    <option value="aa">${mwi.isZh ? "左买左卖" : "ask in,ask out"}</option>
+                    <option value="bb">${mwi.isZh ? "右买右卖" : "bid in,bid out"}</option>
                 </select>
             </div>
             <div>
                 <svg width="14px" height="14px" style="display:inline-block"><use href="/static/media/items_sprite.6d12eb9d.svg#coin"></use></svg>
-                <span>${showNumber(profit)}/次</span>
+                <span>${showNumber(profit)}/${mwi.isZh ? "次" : "each"}</span>
             </div>
             <div>
                 <svg width="14px" height="14px" style="display:inline-block"><use href="/static/media/items_sprite.6d12eb9d.svg#coin"></use></svg>
-                <span title="${showNumber(timesPerHour)}次">${showNumber(profitPerHour)}/时</span>
+                <span title="${showNumber(timesPerHour)}${mwi.isZh ? "次" : "times"}">${showNumber(profitPerHour)}/${mwi.isZh ? "时" : "hour"}</span>
             </div>
             <div>
                 <svg width="14px" height="14px" style="display:inline-block"><use href="/static/media/items_sprite.6d12eb9d.svg#coin"></use></svg>
-                <span title="${showNumber(timesPerDay)}次">${showNumber(profitPerDay)}/天</span>
+                <span title="${showNumber(timesPerDay)}${mwi.isZh ? "次" : "times"}">${showNumber(profitPerDay)}/${mwi.isZh ? "天" : "day"}</span>
             </div>
         </div>`;
         document.querySelector("#alchemoo_includeRare").checked = includeRare;
@@ -658,7 +678,7 @@
             outputContainer.style.lineHeight = "16px";
             outputContainer.style.maxWidth = "220px";
             outputContainer.innerHTML = `
-            <div id="alchemoo_title" style="font-weight: bold; margin-bottom: 10px; text-align: center; color: var(--color-space-300);">炼金结果</div>
+            <div id="alchemoo_title" style="font-weight: bold; margin-bottom: 10px; text-align: center; color: var(--color-space-300);">${mwi.isZh ? "炼金统计" : "Alchemy Result"}</div>
             <div id="alchemoo_cost" style="display: flex; flex-wrap: wrap; gap: 4px;"></div>
             <div id="alchemoo_rate"></div>
             <div id="alchemoo_output" style="display: flex; flex-wrap: wrap; gap: 4px;"></div>
@@ -694,7 +714,7 @@
             let item = itemHashToItem(itemHash);
             let price = getPrice(item.itemHrid);
             text += `
-            <div title="直买价：${price.ask}" style="display: inline-flex;border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;">
+            <div title="price:${price.ask}/${price.bid}" style="display: inline-flex;border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;">
             <svg width="14px" height="14px" style="display:inline-block"><use href="/static/media/items_sprite.6d12eb9d.svg#${item.itemHrid.replace("/items/", "")}"></use></svg>
             <span style="display:inline-block">${getItemNameByHrid(item.itemHrid)}</span>
             <span style="color:red;display:inline-block;font-size:14px;">${showNumber(count).replace("-", "*")}</span>
@@ -713,7 +733,7 @@
             let item = itemHashToItem(itemHash);
             let price = getPrice(item.itemHrid);
             text += `
-            <div title="直卖价：${price.bid}" style="display: inline-flex;border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;">
+            <div title="price:${price.ask}/${price.bid}" style="display: inline-flex;border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;">
             <svg width="14px" height="14px" style="display:inline-block"><use href="/static/media/items_sprite.6d12eb9d.svg#${item.itemHrid.replace("/items/", "")}"></use></svg>
             <span style="display:inline-block">${getItemNameByHrid(item.itemHrid)}</span>
             <span style="color:lime;display:inline-block;font-size:14px;">${showNumber(count).replace("+", "*")}</span>
@@ -735,9 +755,9 @@
         let profitPerDay = predictPerDay[alchemyIndex] || 0;
         document.querySelector("#alchemoo_total").innerHTML =
             `
-        <span>耗时:${secondsToHms(time)}</span>
-        <div>累计收益:<span style="color:${total > 0 ? "lime" : "red"}">${showNumber(total)}</span></div>
-        <div>每日收益:<span style="color:${perDay > profitPerDay ? "lime" : "red"}">${showNumber(total * (86400 / time)).replace("+", "")}</span></div>
+        <span>${mwi.isZh ? "耗时" : "Time Elapsed"}:${secondsToHms(time)}</span>
+        <div>${mwi.isZh ? "累计收益" : "Gain"}:<span style="color:${total > 0 ? "lime" : "red"}">${showNumber(total)}</span></div>
+        <div>${mwi.isZh ? "每日收益" : "Daily"}:<span style="color:${perDay > profitPerDay ? "lime" : "red"}">${showNumber(total * (86400 / time)).replace("+", "")}</span></div>
         `;//总收益
     }
     //mwi.hookMessage("action_completed", countAlchemyOutput);
