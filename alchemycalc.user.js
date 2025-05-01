@@ -279,13 +279,13 @@
 
                 // 处理子节点变化
                 if (mutation.type === 'childList') {
-                    let node = mutation.target.matches(nodeSelector) ? mutation.target : mutation.target.closest(nodeSelector);
+                    let node = mutation.target?.matches(nodeSelector) ? mutation.target : mutation.target.closest(nodeSelector);
                     if (node) {
                         delayCall(updateFunc, observer); // 延迟 100ms 合并变动处理，避免频繁触发
                     }
 
                 } else if (mutation.type === 'characterData') {
-                    let node = mutation.target.matches(nodeSelector) ? mutation.target : mutation.target.closest(nodeSelector);
+                    let node = mutation.target?.matches(nodeSelector) ? mutation.target : mutation.target.closest(nodeSelector);
                     // 文本内容变化（如文本节点修改）
                     if(node)
                         delayCall(updateFunc, observer);
