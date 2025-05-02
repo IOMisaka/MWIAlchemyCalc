@@ -228,7 +228,7 @@
     }
     //类似这样的名字/items/blackberry_donut,/items/knights_ingot
     function getItemDataByHrid(itemHrid) {
-        return clientData.itemDetailMap[itemHrid];
+        return mwi.initClientData.itemDetailMap[itemHrid];
     }
     //类似这样的名字Blackberry Donut,Knight's Ingot
     function getItemDataByName(name) {
