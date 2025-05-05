@@ -2,7 +2,7 @@
 // @name         MWIAlchemyCalc
 
 // @namespace    http://tampermonkey.net/
-// @version      20250504.1
+// @version      20250505.1
 // @description  显示炼金收益和产出统计 milkywayidle 银河奶牛放置
 
 // @author       IOMisaka
@@ -632,13 +632,31 @@ ${mwi.isZh ? "每次收益" : "each"}:${profit}=
     }
     function calcChestPrice(itemHrid) {
         let total = 0;
+        const mode = {
+            "ab": ["ask", "bid"],
+            "ba": ["bid", "ask"],
+            "aa": ["ask", "ask"],
+            "bb": ["bid", "bid"],
+        };
+        let [buyPrice, sellPrice] = mode[priceMode];
+
         getOpenableItems(itemHrid).forEach(openItem => {
-            total += getPrice(openItem.itemHrid).bid * openItem.count;
+            
+            total += getPrice(openItem.itemHrid)[sellPrice] * openItem.count;
         });
         return total;
     }
-    function calcPrice(items) {
+    function calcPrice(items,buy) {
         let total = 0;
+        const mode = {
+            "ab": ["ask", "bid"],
+            "ba": ["bid", "ask"],
+            "aa": ["ask", "ask"],
+            "bb": ["bid", "bid"],
+        };
+        let [buyPrice, sellPrice] = mode[priceMode];
+        let priceType = buy?buyPrice:sellPrice;
+
         for (let item of items) {
 
             if (item.itemHrid === "/items/task_crystal") {//任务水晶有问题，暂时不计算
@@ -646,7 +664,8 @@ ${mwi.isZh ? "每次收益" : "each"}:${profit}=
             else if (getItemDataByHrid(item.itemHrid)?.categoryHrid === "/item_categories/loot") {
                 total += calcChestPrice(item.itemHrid) * item.count;
             } else {
-                total += getPrice(item.itemHrid, item.enhancementLevel ?? 0).ask * item.count;//买入材料价格*数量
+
+                total += getPrice(item.itemHrid, item.enhancementLevel ?? 0)[priceType] * item.count;//买入材料价格*数量
             }
 
         }
@@ -706,15 +725,22 @@ ${mwi.isZh ? "每次收益" : "each"}:${profit}=
                 let arr = itemHash.split("::");
                 return { "itemHrid": arr[2], "enhancementLevel": parseInt(arr[3]), "count": count }
             })
-        );
+        ,true);
         let gain = calcPrice(Object.entries(currentOutput).map(
             ([itemHash, count]) => {
                 let arr = itemHash.split("::");
                 return { "itemHrid": arr[2], "enhancementLevel": parseInt(arr[3]), "count": count }
             })
-        );
+        ,false);
         if (alchemyIndex == 0 && mwi.character?.gameMode === "ironcow") { cost = 0 };//铁牛点金，不计算成本
         let total = cost + gain;
+        const mode = {
+            "ab": ["ask", "bid"],
+            "ba": ["bid", "ask"],
+            "aa": ["ask", "ask"],
+            "bb": ["bid", "bid"],
+        };
+        let [buyPrice, sellPrice] = mode[priceMode];
 
         let text = "";
         //消耗
@@ -722,14 +748,14 @@ ${mwi.isZh ? "每次收益" : "each"}:${profit}=
             let item = itemHashToItem(itemHash);
             let price = getPrice(item.itemHrid);
             text += `
-            <div title="price:${price.ask}/${price.bid}" style="display: inline-flex;border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;">
+            <div title="in:${price[buyPrice]}" style="display: inline-flex;border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;">
             <svg width="14px" height="14px" style="display:inline-block"><use href="/static/media/items_sprite.6d12eb9d.svg#${item.itemHrid.replace("/items/", "")}"></use></svg>
             <span style="display:inline-block">${getItemNameByHrid(item.itemHrid)}</span>
             <span style="color:red;display:inline-block;font-size:14px;">${showNumber(count).replace("-", "*")}</span>
             </div>
             `;
         });
-        if (cost > 0) {//0不显示
+        if (cost < 0) {//0不显示.已经是负数了
             text += `<div style="display: inline-block;border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;"><span style="color:red;font-size:16px;">${showNumber(cost)}</span></div>`;
         }
         document.querySelector("#alchemoo_cost").innerHTML = text;
@@ -741,7 +767,7 @@ ${mwi.isZh ? "每次收益" : "each"}:${profit}=
             let item = itemHashToItem(itemHash);
             let price = getPrice(item.itemHrid);
             text += `
-            <div title="price:${price.ask}/${price.bid}" style="display: inline-flex;border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;">
+            <div title="out:${price[sellPrice]}" style="display: inline-flex;border:1px solid var(--color-space-300);border-radius:4px;padding:1px 5px;">
             <svg width="14px" height="14px" style="display:inline-block"><use href="/static/media/items_sprite.6d12eb9d.svg#${item.itemHrid.replace("/items/", "")}"></use></svg>
             <span style="display:inline-block">${getItemNameByHrid(item.itemHrid)}</span>
             <span style="color:lime;display:inline-block;font-size:14px;">${showNumber(count).replace("+", "*")}</span>
