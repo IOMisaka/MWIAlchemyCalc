@@ -2,7 +2,7 @@
 // @name         MWIAlchemyCalc
 
 // @namespace    http://tampermonkey.net/
-// @version      20250507.1
+// @version      20250507.2
 // @description  显示炼金收益和产出统计 milkywayidle 银河奶牛放置
 
 // @author       IOMisaka
@@ -43,7 +43,7 @@
     }
 
     let characterData = null;
-    let alchemyIndex = 0;
+    let alchemyActionIndex = 0;
     function handleMessage(message) {
         let obj = JSON.parse(message);
         if (obj) {
@@ -116,7 +116,7 @@
                             ].findIndex(x => x === obj.endCharacterAction.actionHrid);
                             countAlchemyOutput(inputHashCount, outputHashCount, index);
                         } else {
-                            alchemyIndex = -1;//不是炼金
+                            alchemyActionIndex = -1;//不是炼金
                         }
                     } catch (e) { }
 
@@ -273,8 +273,8 @@
                     // 文本内容变化（如文本节点修改）
                     let node = document.querySelector(nodeSelector);
                     let targetNode = mutation.target;
-                    while(targetNode){
-                        if(targetNode == node){
+                    while (targetNode) {
+                        if (targetNode == node) {
                             delayCall(updateFunc, observer);
                             break;
                         }
@@ -497,7 +497,7 @@ ${mwi.isZh ? "每次收益" : "each"}:${profit}=
         const selectedIndex = Array.from(buttons).findIndex(button =>
             button.classList.contains('Mui-selected')
         );
-        let isCowinify = (selectedIndex == 0 || (selectedIndex == 3 && alchemyIndex == 0));//点金模式
+        let isCowinify = (selectedIndex == 0 || (selectedIndex == 3 && alchemyActionIndex == 0));//点金模式
 
         //次数,收益
         let result = calculateProfit(ret, mwi.character?.gameMode === "ironcow", isCowinify);
@@ -554,15 +554,15 @@ ${mwi.isZh ? "每次收益" : "each"}:${profit}=
             </div>
         </div>`;
         document.querySelector("#alchemoo_includeRare").checked = includeRare;
-        document.querySelector("#alchemoo_includeRare").addEventListener("change", function () {
+        document.querySelector("#alchemoo_includeRare").onchange = function () {
             includeRare = this.checked;
             handleAlchemyDetailChanged();//重新计算
-        });
+        };
         document.querySelector("#alchemoo_selectMode").value = priceMode;
-        document.querySelector("#alchemoo_selectMode").addEventListener("change", function () {
+        document.querySelector("#alchemoo_selectMode").onchange = function () {
             priceMode = this.value;
             handleAlchemyDetailChanged();//重新计算
-        });
+        };
 
         //console.log(ret);
         observer?.reobserve();
@@ -570,14 +570,15 @@ ${mwi.isZh ? "每次收益" : "each"}:${profit}=
 
     observeNode(".SkillActionDetail_alchemyComponent__1J55d", "body", handleAlchemyDetailChanged, handleAlchemyDetailChanged);
 
-    let currentInput = {};
-    let currentOutput = {};
     let alchemyStartTime = Date.now();
     let lastAction = null;
-
+    let alchemyHistory = [];//历史记录
+    let alchemyIndex = 0;//第几次炼金
     //统计功能
     function countAlchemyOutput(inputHashCount, outputHashCount, index) {
-        alchemyIndex = index;
+        let currentInput = alchemyHistory[alchemyHistory.length-1].input;
+        let currentOutput = alchemyHistory[alchemyHistory.length-1].output;
+        alchemyActionIndex = index;
         for (let itemHash in inputHashCount) {
             currentInput[itemHash] = (currentInput[itemHash] || 0) + inputHashCount[itemHash];
         }
@@ -589,11 +590,15 @@ ${mwi.isZh ? "每次收益" : "each"}:${profit}=
 
     function updateAlchemyAction(action) {
         if ((!lastAction) || (lastAction.id != action.id)) {//新动作，重置统计信息
+            alchemyHistory.push({//记录新动作
+                input: {},
+                output: {},
+            });
+            alchemyIndex=alchemyHistory.length - 1;
             lastAction = action;
-            currentOutput = {};
-            currentInput = {};
             alchemyStartTime = Date.now();//重置开始时间
         }
+
         showOutput();
     }
     function calcChestPrice(itemHrid) {
@@ -607,12 +612,12 @@ ${mwi.isZh ? "每次收益" : "each"}:${profit}=
         let [buyPrice, sellPrice] = mode[priceMode];
 
         getOpenableItems(itemHrid).forEach(openItem => {
-            
+
             total += getPrice(openItem.itemHrid)[sellPrice] * openItem.count;
         });
         return total;
     }
-    function calcPrice(items,buy) {
+    function calcPrice(items, buy) {
         let total = 0;
         const mode = {
             "ab": ["ask", "bid"],
@@ -621,17 +626,17 @@ ${mwi.isZh ? "每次收益" : "each"}:${profit}=
             "bb": ["bid", "bid"],
         };
         let [buyPrice, sellPrice] = mode[priceMode];
-        let priceType = buy?buyPrice:sellPrice;
+        let priceType = buy ? buyPrice : sellPrice;
 
         for (let item of items) {
 
             if (item.itemHrid === "/items/task_crystal") {//任务水晶有问题，暂时不计算
             }
             else if (getItemDataByHrid(item.itemHrid)?.categoryHrid === "/item_categories/loot") {//箱子必定是卖
-                total += calcChestPrice(item.itemHrid) * item.count*0.98;//税
+                total += calcChestPrice(item.itemHrid) * item.count * 0.98;//税
             } else {
 
-                total += getPrice(item.itemHrid, item.enhancementLevel ?? 0)[priceType] * item.count * (buy?1:0.98);//买入材料价格*数量
+                total += getPrice(item.itemHrid, item.enhancementLevel ?? 0)[priceType] * item.count * (buy ? 1 : 0.98);//买入材料价格*数量
             }
 
         }
@@ -672,6 +677,10 @@ ${mwi.isZh ? "每次收益" : "each"}:${profit}=
             outputContainer.style.maxWidth = "220px";
             outputContainer.innerHTML = `
             <div id="alchemoo_title" style="font-weight: bold; margin-bottom: 10px; text-align: center; color: var(--color-space-300);">${mwi.isZh ? "炼金统计" : "Alchemy Result"}</div>
+            <div>
+            <select id="alchemoo_current">
+            </select>
+            </div>
             <div id="alchemoo_cost" style="display: flex; flex-wrap: wrap; gap: 4px;"></div>
             <div id="alchemoo_rate"></div>
             <div id="alchemoo_output" style="display: flex; flex-wrap: wrap; gap: 4px;"></div>
@@ -684,21 +693,36 @@ ${mwi.isZh ? "每次收益" : "each"}:${profit}=
             outputContainer.style.flex = "0 0 auto";
             alchemyContainer.appendChild(outputContainer);
         }
-        "💰"
+        let selector = document.querySelector("#alchemoo_current");
+        selector.innerHTML = "";
+        for (let i = 0; i < alchemyHistory.length; i++) {
+            let option = document.createElement("option");
+            option.value = i;
+            option.text = (i == alchemyHistory.length - 1) ? (mwi.isZh ? "当前" : "current") : `#${i + 1}`;
+            selector.add(option);
+        }
+        selector.selectedIndex = alchemyIndex;
+        selector.onchange = function () {
+            alchemyIndex = this.selectedIndex;
+            showOutput();
+        };
+        
+        let currentInput = alchemyHistory[alchemyIndex].input;
+        let currentOutput = alchemyHistory[alchemyIndex].output;
 
         let cost = calcPrice(Object.entries(currentInput).map(
             ([itemHash, count]) => {
                 let arr = itemHash.split("::");
                 return { "itemHrid": arr[2], "enhancementLevel": parseInt(arr[3]), "count": count }
             })
-        ,true);
+            , true);
         let gain = calcPrice(Object.entries(currentOutput).map(
             ([itemHash, count]) => {
                 let arr = itemHash.split("::");
                 return { "itemHrid": arr[2], "enhancementLevel": parseInt(arr[3]), "count": count }
             })
-        ,false);
-        if (alchemyIndex == 0 && mwi.character?.gameMode === "ironcow") { cost = 0 };//铁牛点金，不计算成本
+            , false);
+        if (alchemyActionIndex == 0 && mwi.character?.gameMode === "ironcow") { cost = 0 };//铁牛点金，不计算成本
         let total = cost + gain;
         const mode = {
             "ab": ["ask", "bid"],
@@ -752,13 +776,23 @@ ${mwi.isZh ? "每次收益" : "each"}:${profit}=
         //document.querySelector("#alchemoo_time").innerHTML = `<span>耗时:${secondsToHms(time)}</span>`;//时间
         let perDay = (86400 / time) * total;
 
-        let profitPerDay = predictPerDay[alchemyIndex] || 0;
-        document.querySelector("#alchemoo_total").innerHTML =
-            `
-        <span>${mwi.isZh ? "耗时" : "Time Elapsed"}:${secondsToHms(time)}</span>
-        <div>${mwi.isZh ? "累计收益" : "Gain"}:<span style="color:${total > 0 ? "lime" : "red"}">${showNumber(total)}</span></div>
-        <div>${mwi.isZh ? "每日收益" : "Daily"}:<span style="color:${perDay > profitPerDay ? "lime" : "red"}">${showNumber(total * (86400 / time)).replace("+", "")}</span></div>
-        `;//总收益
+        let profitPerDay = predictPerDay[alchemyActionIndex] || 0;
+        
+        let timeElapsedStr =`<span>${mwi.isZh ? "耗时" : "Time Elapsed"}:${secondsToHms(time)}</span>`;
+        let totalProfitStr = `<div>${mwi.isZh ? "累计收益" : "Gain"}:<span style="color:${total > 0 ? "lime" : "red"}">${showNumber(total)}</span></div>`;
+        let perdayProfitStr = `<div>${mwi.isZh ? "每日收益" : "Daily"}:<span style="color:${perDay > profitPerDay ? "lime" : "red"}">${showNumber(total * (86400 / time)).replace("+", "")}</span></div>`
+
+        let totalStr = "";
+        if(alchemyIndex==alchemyHistory.length-1){
+            totalStr += timeElapsedStr;
+            totalStr += totalProfitStr;
+            totalStr += perdayProfitStr;
+        }else{
+            totalStr += totalProfitStr;
+        }
+
+        //总收益
+        document.querySelector("#alchemoo_total").innerHTML = totalStr;
     }
     //mwi.hookMessage("action_completed", countAlchemyOutput);
     //mwi.hookMessage("action_updated", updateAlchemyAction)
