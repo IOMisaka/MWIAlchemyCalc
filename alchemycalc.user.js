@@ -2,7 +2,7 @@
 // @name         MWIAlchemyCalc
 
 // @namespace    http://tampermonkey.net/
-// @version      20250505.1
+// @version      20250507.1
 // @description  显示炼金收益和产出统计 milkywayidle 银河奶牛放置
 
 // @author       IOMisaka
@@ -42,14 +42,7 @@
         }
     }
 
-    let clientData = null;
     let characterData = null;
-    function loadClientData() {
-        if (localStorage.getItem("initClientData")) {
-            const obj = JSON.parse(localStorage.getItem("initClientData"));
-            clientData = obj;
-        }
-    }
     let alchemyIndex = 0;
     function handleMessage(message) {
         let obj = JSON.parse(message);
@@ -222,21 +215,13 @@
     function getItemHridByShowName(showName) {
         return window.mwi.ensureItemHrid(showName)
     }
-    //类似这样的名字blackberry_donut,knights_ingot
-    function getItemDataByHridName(hrid_name) {
-        return clientData.itemDetailMap["/items/" + hrid_name];
-    }
     //类似这样的名字/items/blackberry_donut,/items/knights_ingot
     function getItemDataByHrid(itemHrid) {
         return mwi.initClientData.itemDetailMap[itemHrid];
     }
-    //类似这样的名字Blackberry Donut,Knight's Ingot
-    function getItemDataByName(name) {
-        return Object.entries(clientData.itemDetailMap).find(([k, v]) => v.name == name);
-    }
     function getOpenableItems(itemHrid) {
         let items = [];
-        for (let openItem of clientData.openableLootDropMap[itemHrid]) {
+        for (let openItem of mwi.initClientData.openableLootDropMap[itemHrid]) {
             items.push({
                 itemHrid: openItem.itemHrid,
                 count: (openItem.minCount + openItem.maxCount) / 2 * openItem.dropRate
@@ -311,26 +296,7 @@
         observer.observe(rootNode, config);
         return observer;
     }
-
-    loadClientData();//加载游戏数据
     hookWS();//hook收到角色信息
-
-    //模块逻辑代码
-    const MARKET_API_URL = "https://raw.githubusercontent.com/holychikenz/MWIApi/main/milkyapi.json";
-
-    let marketData = JSON.parse(localStorage.getItem("MWIAPI_JSON") || localStorage.getItem("MWITools_marketAPI_json") || "{}");//Use MWITools的API数据
-    if (!(marketData?.time > Date.now() / 1000 - 86400)) {//如果本地缓存数据过期，则重新获取
-        fetch(MARKET_API_URL).then(res => {
-            res.json().then(data => {
-                marketData = data;
-                //更新本地缓存数据
-                localStorage.setItem("MWIAPI_JSON", JSON.stringify(data));//更新本地缓存数据
-                console.info("MWIAPI_JSON updated:", new Date(marketData.time * 1000).toLocaleString());
-            })
-        });
-    }
-
-
     //返回[买,卖]
     function getPrice(itemHrid, enhancementLevel = 0) {
         return mwi.coreMarket.getItemPrice(itemHrid, enhancementLevel);
@@ -390,7 +356,7 @@
         let description = "";
         if (isIroncow && isCoinify) {//铁牛点金不计算输入
             profit = tea + output + essence + rare + catalyst;
-            description = `Last Update：${new Date(marketData.time * 1000).toLocaleString()}
+            description = `
 (${mwi.isZh ? "税" : "tax"}${isIroncow ? "0" : "2%"})
 (${mwi.isZh ? "效率" : "effeciency"}+${(data.effeciency * 100).toFixed(2)}%)
 ${mwi.isZh ? "每次收益" : "each"}:${profit}=
@@ -403,7 +369,7 @@ ${mwi.isZh ? "每次收益" : "each"}:${profit}=
 
         } else {
             profit = input + tea + output + essence + rare + catalyst;
-            description = `Last Update：${new Date(marketData.time * 1000).toLocaleString()}
+            description = `
 (${mwi.isZh ? "税" : "tax"}${isIroncow ? "0" : "2%"})
 (${mwi.isZh ? "效率" : "effeciency"}+${(data.effeciency * 100).toFixed(2)}%)
 ${mwi.isZh ? "每次收益" : "each"}:${profit}=
@@ -661,11 +627,11 @@ ${mwi.isZh ? "每次收益" : "each"}:${profit}=
 
             if (item.itemHrid === "/items/task_crystal") {//任务水晶有问题，暂时不计算
             }
-            else if (getItemDataByHrid(item.itemHrid)?.categoryHrid === "/item_categories/loot") {
-                total += calcChestPrice(item.itemHrid) * item.count;
+            else if (getItemDataByHrid(item.itemHrid)?.categoryHrid === "/item_categories/loot") {//箱子必定是卖
+                total += calcChestPrice(item.itemHrid) * item.count*0.98;//税
             } else {
 
-                total += getPrice(item.itemHrid, item.enhancementLevel ?? 0)[priceType] * item.count;//买入材料价格*数量
+                total += getPrice(item.itemHrid, item.enhancementLevel ?? 0)[priceType] * item.count * (buy?1:0.98);//买入材料价格*数量
             }
 
         }
