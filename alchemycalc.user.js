@@ -2,7 +2,7 @@
 // @name         MWIAlchemyCalc
 
 // @namespace    http://tampermonkey.net/
-// @version      20250507.4
+// @version      20250715.1
 // @description  显示炼金收益和产出统计 milkywayidle 银河奶牛放置
 
 // @author       IOMisaka
@@ -411,17 +411,32 @@ ${mwi.isZh ? "每次收益" : "each"}:${profit}=
         let costNodes = document.querySelector(".AlchemyPanel_skillActionDetailContainer__o9SsW .SkillActionDetail_itemRequirements__3SPnA");
         if (!costNodes) return;//没有炼金详情就不处理
 
-        let costs = Array.from(costNodes.children);
-        //每三个元素取textContent拼接成一个字符串，用空格和/分割
-        for (let i = 0; i < costs.length; i += 3) {
+        let itemContainers = costNodes.querySelectorAll(".Item_itemContainer__x7kH1");
+        itemContainers.forEach(container => {
+            // 找到包含“/ 数量”字样的节点（材料需求量）
+            let inputCountNode = container.previousElementSibling;
+            while (inputCountNode && !inputCountNode.classList.contains("SkillActionDetail_inputCount__1rdrn")) {
+                inputCountNode = inputCountNode.previousElementSibling;
+            }
 
-            let need = parseNumber(costs[i + 1].textContent);
-            let nameArr = costs[i + 2].textContent.split("+");
+            if (!inputCountNode) return; // 跳过无效结构
+
+            let need = parseNumber(inputCountNode.textContent);
+
+            // 获取名称
+            let nameNode = container.querySelector(".Item_name__2C42x");
+            if (!nameNode) return;
+
+            let nameArr = nameNode.textContent.split("+");
             let itemHrid = getItemHridByShowName(nameArr[0]);
             let enhancementLevel = nameArr.length > 1 ? parseNumber(nameArr[1]) : 0;
 
-            inputItems.push({ itemHrid: itemHrid, enhancementLevel: enhancementLevel, count: need });
-        }
+            inputItems.push({
+                itemHrid: itemHrid,
+                enhancementLevel: enhancementLevel,
+                count: need
+            });
+        });
 
         //炼金输出
         for (let line of document.querySelectorAll(".SkillActionDetail_alchemyOutput__6-92q .SkillActionDetail_drop__26KBZ")) {
@@ -477,7 +492,7 @@ ${mwi.isZh ? "每次收益" : "each"}:${profit}=
                 teaUsage.push({ itemHrid: tea.itemHrid, count: costSeconds / 300 });//300秒消耗一个茶
             }
         }
-        console.info("效率", effeciency);
+        //console.info("效率", effeciency);
 
 
         //返回结果
@@ -575,8 +590,8 @@ ${mwi.isZh ? "每次收益" : "each"}:${profit}=
     let alchemyIndex = 0;//第几次炼金
     //统计功能
     function countAlchemyOutput(inputHashCount, outputHashCount, index) {
-        let currentInput = alchemyHistory[alchemyHistory.length-1].input;
-        let currentOutput = alchemyHistory[alchemyHistory.length-1].output;
+        let currentInput = alchemyHistory[alchemyHistory.length - 1].input;
+        let currentOutput = alchemyHistory[alchemyHistory.length - 1].output;
         alchemyActionIndex = index;
         for (let itemHash in inputHashCount) {
             currentInput[itemHash] = (currentInput[itemHash] || 0) + inputHashCount[itemHash];
@@ -593,7 +608,7 @@ ${mwi.isZh ? "每次收益" : "each"}:${profit}=
                 input: {},
                 output: {},
             });
-            alchemyIndex=alchemyHistory.length - 1;
+            alchemyIndex = alchemyHistory.length - 1;
             lastAction = action;
             alchemyStartTime = Date.now();//重置开始时间
         }
@@ -705,7 +720,7 @@ ${mwi.isZh ? "每次收益" : "each"}:${profit}=
             alchemyIndex = this.selectedIndex;
             showOutput();
         };
-        
+
         let currentInput = alchemyHistory[alchemyIndex].input;
         let currentOutput = alchemyHistory[alchemyIndex].output;
 
@@ -776,17 +791,17 @@ ${mwi.isZh ? "每次收益" : "each"}:${profit}=
         let perDay = (86400 / time) * total;
 
         let profitPerDay = predictPerDay[alchemyActionIndex] || 0;
-        
-        let timeElapsedStr =`<span>${mwi.isZh ? "耗时" : "Time Elapsed"}:${secondsToHms(time)}</span>`;
+
+        let timeElapsedStr = `<span>${mwi.isZh ? "耗时" : "Time Elapsed"}:${secondsToHms(time)}</span>`;
         let totalProfitStr = `<div>${mwi.isZh ? "累计收益" : "Gain"}:<span style="color:${total > 0 ? "lime" : "red"}">${showNumber(total)}</span></div>`;
         let perdayProfitStr = `<div>${mwi.isZh ? "每日收益" : "Daily"}:<span style="color:${perDay > profitPerDay ? "lime" : "red"}">${showNumber(total * (86400 / time)).replace("+", "")}</span></div>`
 
         let totalStr = "";
-        if(alchemyIndex==alchemyHistory.length-1){
+        if (alchemyIndex == alchemyHistory.length - 1) {
             totalStr += timeElapsedStr;
             totalStr += totalProfitStr;
             totalStr += perdayProfitStr;
-        }else{
+        } else {
             totalStr += totalProfitStr;
         }
 
