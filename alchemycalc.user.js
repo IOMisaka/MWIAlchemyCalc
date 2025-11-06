@@ -2,11 +2,12 @@
 // @name         MWIAlchemyCalc
 
 // @namespace    http://tampermonkey.net/
-// @version      20250715.1
+// @version      20251106.1
 // @description  显示炼金收益和产出统计 milkywayidle 银河奶牛放置
 
 // @author       IOMisaka
 // @match        https://www.milkywayidle.com/*
+// @match        https://www.milkywayidlecn.com/*
 // @icon         https://www.milkywayidle.com/favicon.svg
 // @grant        none
 // @license      MIT
@@ -31,7 +32,8 @@
             if (!(socket instanceof WebSocket)) {
                 return oriGet.call(this);
             }
-            if (socket.url.indexOf("api.milkywayidle.com/ws") <= -1) {
+            if (socket.url.indexOf("api.milkywayidle.com/ws") <= -1 &&
+                socket.url.indexOf("api.milkywayidlecn.com/ws") <= -1) {
                 return oriGet.call(this);
             }
             const message = oriGet.call(this);
